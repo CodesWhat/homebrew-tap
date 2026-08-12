@@ -9,7 +9,7 @@
 
 <h1>Homebrew Tap</h1>
 
-**Official Homebrew distribution for CodesWhat command-line tools.**
+**Official Homebrew distribution for CodesWhat software.**
 
 </div>
 
@@ -38,11 +38,14 @@
 
 <h2 align="center" id="quick-start">🚀 Quick Start</h2>
 
-Install a tool directly from the tap. Homebrew adds the tap automatically, so a
+Install a product directly from the tap. Homebrew adds the tap automatically, so a
 separate `brew tap` command is not required. Using the fully qualified cask name
 also trusts only that cask rather than every current and future item in the tap.
 
 ```bash
+# idlescreen
+brew install --cask codeswhat/tap/idlescreen
+
 # Portwing
 brew install --cask codeswhat/tap/portwing
 
@@ -72,23 +75,25 @@ You can also review every published definition directly in
 
 <h2 align="center" id="available-casks">📦 Available Casks</h2>
 
-| Tool | What it does | Documentation | Availability |
+| Product | What it does | Documentation | Availability |
 | --- | --- | --- | --- |
+| [idlescreen](https://github.com/CodesWhat/idlescreen) | Metal-rendered ASCII art screen saver and companion Studio for macOS | [README](https://github.com/CodesWhat/idlescreen#readme) | Available now |
 | [Portwing](https://github.com/CodesWhat/portwing) | Security-first remote Docker agent for Drydock and standalone API clients | [Installation guide](https://github.com/CodesWhat/portwing/blob/main/docs/content/docs/installation.mdx) | Available now |
-| [Sockguard](https://github.com/CodesWhat/sockguard) | Default-deny Docker socket proxy with granular request filtering and audit logging | [Getting started](https://getsockguard.com/docs/getting-started) | Next stable release |
+| [Sockguard](https://github.com/CodesWhat/sockguard) | Default-deny Docker socket proxy with granular request filtering and audit logging | [Getting started](https://getsockguard.com/docs/getting-started) | Available now |
 
 This repository distributes official prebuilt release archives. Project source,
 configuration, documentation, changelogs, and issue tracking remain in each
-tool's own repository.
+product's own repository.
 
 <hr>
 
 <h2 align="center" id="upgrade-and-uninstall">🔄 Upgrade and Uninstall</h2>
 
-Refresh Homebrew metadata and upgrade an installed tool:
+Refresh Homebrew metadata and upgrade an installed product:
 
 ```bash
 brew update
+brew upgrade --cask idlescreen
 brew upgrade --cask portwing
 brew upgrade --cask sockguard
 ```
@@ -97,17 +102,19 @@ See what is currently installed:
 
 ```bash
 brew list --cask
+brew info --cask codeswhat/tap/idlescreen
 brew info --cask codeswhat/tap/portwing
 ```
 
-Uninstall a tool:
+Uninstall a product:
 
 ```bash
+brew uninstall --cask idlescreen
 brew uninstall --cask portwing
 brew uninstall --cask sockguard
 ```
 
-Remove the tap after uninstalling its tools:
+Remove the tap after uninstalling its casks:
 
 ```bash
 brew untap codeswhat/tap
@@ -121,11 +128,12 @@ Consult the product's uninstall documentation before removing operational data.
 
 <h2 align="center" id="brewfile-usage">🧾 Brewfile Usage</h2>
 
-Use a `Brewfile` to make CodesWhat tool installation reproducible:
+Use a `Brewfile` to make CodesWhat software installation reproducible:
 
 ```ruby
 tap "codeswhat/tap"
 
+cask "codeswhat/tap/idlescreen", trusted: true
 cask "codeswhat/tap/portwing", trusted: true
 cask "codeswhat/tap/sockguard", trusted: true
 ```
@@ -136,13 +144,12 @@ Apply it with:
 brew bundle install
 ```
 
-Omit the Sockguard line until its Homebrew-enabled stable release is published.
-
 <hr>
 
 <h2 align="center" id="platform-support">🖥️ Platform Support</h2>
 
-The generated casks select the matching official release archive for the host:
+The generated command-line casks select the matching official release archive
+for the host:
 
 | Operating system | Architectures |
 | --- | --- |
@@ -154,6 +161,9 @@ Homebrew itself must be installed and available on `PATH`. See the official
 [Homebrew on Linux](https://docs.brew.sh/Homebrew-on-Linux) for supported host
 requirements.
 
+idlescreen is a universal macOS application for Apple silicon and Intel. It
+requires macOS 26 Tahoe or later and is not available on Linux.
+
 <hr>
 
 <h2 align="center" id="release-integrity">🔐 Release Integrity</h2>
@@ -162,7 +172,7 @@ Each cask:
 
 - downloads archives only from the corresponding official CodesWhat GitHub
   Releases page;
-- pins a SHA-256 digest for every operating-system and architecture pair;
+- pins a SHA-256 digest for every release artifact;
 - lets Homebrew verify that digest before installing the executable; and
 - exposes the upstream project homepage and product-specific operational
   caveats through `brew info`.
@@ -182,18 +192,19 @@ lives with the project:
 
 - [Portwing release verification](https://github.com/CodesWhat/portwing/blob/main/docs/content/docs/verification.mdx)
 - [Sockguard documentation](https://getsockguard.com/docs)
+- [idlescreen building and release verification](https://github.com/CodesWhat/idlescreen/blob/main/docs/BUILDING.md)
 
 > [!IMPORTANT]
-> Installing a tool does not configure access to Docker, create authentication
-> credentials, or grant the runtime permissions it needs. Follow the relevant
-> product guide before starting it.
+> Installing Portwing or Sockguard does not configure Docker access, create
+> authentication credentials, or grant runtime permissions. Follow the relevant
+> product guide before starting either service.
 
 <hr>
 
 <h2 align="center" id="how-releases-reach-this-tap">⚙️ How Releases Reach This Tap</h2>
 
-The casks under [`Casks/`](Casks/) are generated by GoReleaser from the source
-project's release configuration. On each stable release, the source project:
+The casks under [`Casks/`](Casks/) are generated by the owning source project's
+release tooling. On each stable release, the source project:
 
 1. builds archives for the supported platforms and architectures;
 2. publishes those artifacts and their checksums to GitHub Releases;
@@ -201,15 +212,13 @@ project's release configuration. On each stable release, the source project:
 4. commits the generated cask to this repository; and
 5. smoke-tests installation from `codeswhat/tap` on a clean runner.
 
-Snapshots and prereleases do not update the tap. The cask header identifies
-generated files:
+Snapshots and prereleases do not update the tap. Each cask header identifies
+the generator that owns it. Do not edit a generated cask by hand. Fix the
+generator in the source project so the next release preserves the change.
 
 ```ruby
-# This file was generated by GoReleaser. DO NOT EDIT.
+# This file was generated by idlescreen. DO NOT EDIT.
 ```
-
-Do not edit a generated cask by hand. Fix its GoReleaser configuration in the
-source project so the next release preserves the change.
 
 <hr>
 
@@ -245,14 +254,14 @@ Do not force the installation. Refresh the tap and retry once:
 
 ```bash
 brew update
-brew install --cask codeswhat/tap/portwing
+brew install --cask codeswhat/tap/idlescreen
 ```
 
 If the mismatch remains, open a tap issue and include the cask name, requested
 version, operating system, architecture, and complete Homebrew error. Never
 include credentials or private configuration.
 
-### macOS blocks an executable
+### macOS blocks an app or executable
 
 Install through this tap rather than running an archive copied from another
 machine. Then consult the product's installation guide for its current signing
@@ -267,6 +276,7 @@ Use the issue tracker that owns the problem:
 | Problem | Report it here |
 | --- | --- |
 | Tap discovery, download, checksum, or Homebrew installation | [CodesWhat/homebrew-tap issues](https://github.com/CodesWhat/homebrew-tap/issues) |
+| idlescreen behavior or configuration | [CodesWhat/idlescreen issues](https://github.com/CodesWhat/idlescreen/issues) |
 | Portwing behavior or configuration | [CodesWhat/portwing issues](https://github.com/CodesWhat/portwing/issues) |
 | Sockguard behavior or policy configuration | [CodesWhat/sockguard issues](https://github.com/CodesWhat/sockguard/issues) |
 | Private security vulnerability | The security-reporting process in the affected project's `SECURITY.md` |
