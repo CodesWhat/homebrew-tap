@@ -1,0 +1,79 @@
+name: update-careerrat-cask
+
+# Watches CodesWhat/careerrat for a new published release and updates
+# Casks/careerrat.rb to match, committing directly to main the same way the
+# goreleaser-managed casks (sockguard, portwing) already land here. The cask
+# body comes from careerrat's own scripts/generate-homebrew-cask.sh, which
+# downloads the published release DMG and hashes it, so the sha256 provably
+# matches what users download.
+#
+# Runs on a schedule and on manual dispatch. Uses only this repo's
+# GITHUB_TOKEN; no cross-repo credential exists on either side. If the cask
+# already matches the latest release, every run is a clean no-op.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  update-cask:
+    name: update the careerrat cask
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Harden the runner (audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      # persist-credentials stays on for this checkout on purpose: the last
+      # step pushes the cask bump back to this repo's main.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: CodesWhat/careerrat
+          path: careerrat-src
+          persist-credentials: false
+      - name: Resolve the latest published careerrat release
+        id: release
+        run: |
+          set -euo pipefail
+          tag="$(gh release list --repo CodesWhat/careerrat --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')"
+          if [ -z "$tag" ]; then
+            echo "No published release found; nothing to do."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="${tag#v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Latest release tag '$tag' does not match vX.Y.Z"
+            exit 1
+          fi
+          current="$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' Casks/careerrat.rb | head -1 || true)"
+          if [ "$version" = "$current" ]; then
+            echo "Cask already at $version; nothing to do."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Regenerate the cask and commit it to main
+        if: steps.release.outputs.version != ''
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          careerrat-src/scripts/generate-homebrew-cask.sh --version "$VERSION" --write Casks/careerrat.rb
+          if git diff --quiet -- Casks/careerrat.rb; then
+            echo "Generated cask is identical; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/careerrat.rb
+          git commit -m "build(cask): update careerrat to $VERSION"
+          git push origin HEAD:main
