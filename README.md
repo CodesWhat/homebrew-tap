@@ -246,7 +246,9 @@ here by another project's tooling is otherwise unexamined until a user hits it:
   daily and fails if any cask has fallen behind the latest release of the
   project that owns it, or if any download URL has stopped resolving.
 
-Both are plain scripts under [`scripts/`](scripts/) and can be run locally:
+Both are plain scripts under [`scripts/`](scripts/) and can be run locally. The
+drift check needs an authenticated GitHub CLI (`gh auth login`, or `GH_TOKEN`
+set) to read each project's releases; the audit needs Homebrew:
 
 ```bash
 bash scripts/check-cask-drift.sh

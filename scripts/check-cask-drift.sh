@@ -21,6 +21,16 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+# Fail on the prerequisite rather than on four confusing empty release lookups.
+if ! command -v gh >/dev/null 2>&1; then
+  echo 'ERROR  the GitHub CLI (gh) is required: https://cli.github.com' >&2
+  exit 2
+fi
+if ! gh auth status >/dev/null 2>&1; then
+  echo 'ERROR  gh is not authenticated. Run "gh auth login", or set GH_TOKEN.' >&2
+  exit 2
+fi
+
 # Owning repository for each cask, when it is not simply CodesWhat/<cask>.
 # Add an entry here if a cask token ever stops matching its repository name.
 upstream_repo() {
