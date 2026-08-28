@@ -1,0 +1,7 @@
+
+# Agent worktrees and local agent state
+.claude/
+.codex/
+
+# Local-only planning, notes and scratch. Private by default, never committed.
+.planning/
