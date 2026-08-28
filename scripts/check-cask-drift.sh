@@ -70,6 +70,16 @@ for cask in Casks/*.rb; do
     continue
   fi
 
+  # Only a leading v is stripped, so a project that started tagging
+  # "release-1.2.3" would report as permanent drift against a correctly pinned
+  # cask. Name that as the tagging change it is, rather than blaming the cask.
+  if ! printf '%s' "$tag" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+$'; then
+    printf 'ERROR  %-12s %s latest tag %s is not vX.Y.Z; this check cannot compare it\n' \
+      "$token" "$repo" "$tag"
+    status=1
+    continue
+  fi
+
   latest="${tag#v}"
   if [ "$pinned" = "$latest" ]; then
     printf 'ok     %-12s %s\n' "$token" "$pinned"

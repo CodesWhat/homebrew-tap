@@ -34,17 +34,25 @@ if [ "$#" -gt 0 ]; then
   exit 2
 fi
 
-# Point Homebrew at this checkout, so the audit reads the casks as they exist
-# here instead of the published tap. Symlinking is what Homebrew's own CI does.
-tap_dir="$(brew --repository)/Library/Taps/codeswhat/homebrew-tap"
-if [ -e "$tap_dir" ] && [ ! -L "$tap_dir" ]; then
-  echo "note: $tap_dir is a real checkout, auditing that instead of this tree." >&2
-elif [ ! -e "$tap_dir" ]; then
-  mkdir -p "$(dirname "$tap_dir")"
-  ln -s "$PWD" "$tap_dir"
+# Point Homebrew at this checkout under a tap name of its own, never
+# codeswhat/tap. If the real tap is already installed -- which it is on any
+# machine that has run `brew install` from it -- reusing that name makes
+# `brew audit` resolve the installed copy instead of the working tree, and
+# report a green that says nothing about the changes being tested.
+tap_dir="$(brew --repository)/Library/Taps/codeswhat-ci/homebrew-tap"
+tap_name="codeswhat-ci/tap"
+if [ -e "$tap_dir" ] || [ -L "$tap_dir" ]; then
+  echo "ERROR  $tap_dir already exists; remove it and re-run." >&2
+  exit 2
 fi
+mkdir -p "$(dirname "$tap_dir")"
+ln -s "$PWD" "$tap_dir"
+trap 'rm -f "$tap_dir"; rmdir "$(dirname "$tap_dir")" 2>/dev/null || true' EXIT
 
-audit_args=(--cask)
+# --os/--arch because this tap carries both arm64-only casks and casks with
+# separate on_intel and on_arm blocks. Left to itself brew audits only the
+# runner's own architecture, so one of those two branches would never be read.
+audit_args=(--cask --os=macos --arch=all)
 if [ "$online" -eq 1 ]; then
   audit_args+=(--online)
 fi
@@ -54,7 +62,7 @@ for cask in Casks/*.rb; do
   [ -e "$cask" ] || continue
   token="$(basename "$cask" .rb)"
   printf '=== %s ===\n' "$token"
-  if brew audit "${audit_args[@]}" "codeswhat/tap/$token"; then
+  if brew audit "${audit_args[@]}" "$tap_name/$token"; then
     printf 'ok     %s\n' "$token"
   else
     printf 'FAILED %s\n' "$token"
