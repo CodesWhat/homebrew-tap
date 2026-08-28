@@ -4,8 +4,9 @@
 # rather than whatever copy of the tap Homebrew already has installed.
 #
 # Usage:
-#   bash scripts/audit-casks.sh            # offline correctness checks
-#   bash scripts/audit-casks.sh --online   # also verify every URL resolves
+#   bash scripts/audit-casks.sh                  # offline, every cask
+#   bash scripts/audit-casks.sh --online         # also verify URLs resolve
+#   bash scripts/audit-casks.sh careerrat        # just one cask
 #
 # The offline pass is fast and has no network dependency, so it is the gate on
 # pull requests and pushes. The --online pass downloads from each url stanza to
@@ -29,10 +30,23 @@ if [ "${1:-}" = "--online" ]; then
   online=1
   shift
 fi
-if [ "$#" -gt 0 ]; then
-  echo "usage: $0 [--online]" >&2
-  exit 2
+
+# With no arguments, audit the whole tap. Named tokens audit just those, so a
+# release automation can gate on the one cask it is about to publish without
+# being blocked by an unrelated cask that some other project pushed broken.
+tokens=("$@")
+if [ "${#tokens[@]}" -eq 0 ]; then
+  for cask in Casks/*.rb; do
+    [ -e "$cask" ] || continue
+    tokens+=("$(basename "$cask" .rb)")
+  done
 fi
+for token in "${tokens[@]}"; do
+  if [ ! -e "Casks/$token.rb" ]; then
+    echo "ERROR  no such cask: Casks/$token.rb" >&2
+    exit 2
+  fi
+done
 
 # Point Homebrew at this checkout under a tap name of its own, never
 # codeswhat/tap. If the real tap is already installed -- which it is on any
@@ -58,9 +72,7 @@ if [ "$online" -eq 1 ]; then
 fi
 
 status=0
-for cask in Casks/*.rb; do
-  [ -e "$cask" ] || continue
-  token="$(basename "$cask" .rb)"
+for token in "${tokens[@]}"; do
   printf '=== %s ===\n' "$token"
   if brew audit "${audit_args[@]}" "$tap_name/$token"; then
     printf 'ok     %s\n' "$token"

@@ -23,16 +23,11 @@ on:
       - "Casks/**"
       - "scripts/**"
       - ".github/workflows/cask-ci.yml"
-  # update-careerrat-cask.yml pushes its cask bump with the default
-  # GITHUB_TOKEN, and GitHub deliberately does not start workflows from such a
-  # push, to stop workflows triggering themselves. So the `push` trigger above
-  # never fires for the one automation that lives in this repository -- exactly
-  # the cask that would go unaudited. workflow_run is not subject to that rule.
-  # The cross-repo pushes (portwing, sockguard, idlescreen) authenticate as
-  # something other than this repo's GITHUB_TOKEN, so `push` does cover those.
-  workflow_run:
-    workflows: [update-careerrat-cask]
-    types: [completed]
+  # A push made by update-careerrat-cask.yml with the default GITHUB_TOKEN does
+  # not start workflows, so `push` above cannot cover that cask. It audits
+  # itself in-place before pushing instead. Using workflow_run to reach across
+  # would mean adopting a trigger that runs with the base repository's secrets,
+  # for no benefit the in-place gate does not already give.
   workflow_dispatch: {}
 
 permissions: {}
@@ -47,10 +42,6 @@ jobs:
     # macOS because the tap ships macOS-only casks; `brew audit --cask` needs a
     # macOS host to evaluate their depends_on stanzas honestly.
     runs-on: macos-latest
-    # A failed updater run pushed nothing, so there is no new state to audit.
-    if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: read
     steps:
