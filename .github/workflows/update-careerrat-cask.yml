@@ -54,7 +54,11 @@ jobs:
             echo "::error::Latest release tag '$tag' does not match vX.Y.Z"
             exit 1
           fi
-          current="$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' Casks/careerrat.rb | head -1 || true)"
+          # Read the version stanza specifically. Matching the first three-part
+          # number anywhere in the file happens to work today only because
+          # `version` is the first such number; a comment mentioning a version
+          # above it would wedge this into a permanent, green no-op.
+          current="$(sed -n 's/^[[:space:]]*version "\([^"]*\)".*/\1/p' Casks/careerrat.rb | head -1 | cut -d, -f1 || true)"
           if [ "$version" = "$current" ]; then
             echo "Cask already at $version; nothing to do."
             echo "version=" >> "$GITHUB_OUTPUT"
