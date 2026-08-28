@@ -1,0 +1,56 @@
+name: cask-ci
+
+# Validates every cask in the tap before, and immediately after, it reaches
+# users. Four separate automations commit to this repository's main branch --
+# the careerrat workflow that lives here, plus GoReleaser in portwing and
+# sockguard and idlescreen's own release job -- and until this workflow existed
+# none of them had anything checking that what they pushed was installable. A
+# malformed cask breaks `brew install` for everyone who has tapped this repo,
+# so it is worth catching in seconds rather than in a bug report.
+#
+# Offline audit only. See scripts/audit-casks.sh for why `brew style` is not a
+# gate here, and cask-drift-sentinel.yml for the online URL checks.
+
+on:
+  pull_request:
+    paths:
+      - "Casks/**"
+      - "scripts/**"
+      - ".github/workflows/cask-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Casks/**"
+      - "scripts/**"
+      - ".github/workflows/cask-ci.yml"
+  # A push made by update-careerrat-cask.yml with the default GITHUB_TOKEN does
+  # not start workflows, so `push` above cannot cover that cask. It audits
+  # itself in-place before pushing instead. Using workflow_run to reach across
+  # would mean adopting a trigger that runs with the base repository's secrets,
+  # for no benefit the in-place gate does not already give.
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: cask-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: audit every cask
+    # macOS because the tap ships macOS-only casks; `brew audit --cask` needs a
+    # macOS host to evaluate their depends_on stanzas honestly.
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Audit the casks
+        run: bash scripts/audit-casks.sh

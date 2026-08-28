@@ -21,7 +21,14 @@ permissions: {}
 jobs:
   update-cask:
     name: update the careerrat cask
-    runs-on: ubuntu-latest
+    # macOS so the generated cask can be audited here, before it is pushed,
+    # rather than after users can already install it. A push made with the
+    # default GITHUB_TOKEN does not start other workflows, so cask-ci cannot
+    # cover this cask from the outside; gating in-place is the fix. The
+    # generator needs only bash, curl, shasum, awk and grep, all of which are
+    # native here (it calls node solely to read package.json when --version is
+    # omitted, and this workflow always passes it).
+    runs-on: macos-latest
     permissions:
       contents: write
     env:
@@ -54,7 +61,11 @@ jobs:
             echo "::error::Latest release tag '$tag' does not match vX.Y.Z"
             exit 1
           fi
-          current="$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' Casks/careerrat.rb | head -1 || true)"
+          # Read the version stanza specifically. Matching the first three-part
+          # number anywhere in the file happens to work today only because
+          # `version` is the first such number; a comment mentioning a version
+          # above it would wedge this into a permanent, green no-op.
+          current="$(sed -n 's/^[[:space:]]*version "\([^"]*\)".*/\1/p' Casks/careerrat.rb | head -1 | cut -d, -f1 || true)"
           if [ "$version" = "$current" ]; then
             echo "Cask already at $version; nothing to do."
             echo "version=" >> "$GITHUB_OUTPUT"
@@ -72,6 +83,9 @@ jobs:
             echo "Generated cask is identical; nothing to commit."
             exit 0
           fi
+          # Audit before publishing. Scoped to careerrat so an unrelated cask
+          # that another project pushed broken cannot block this release.
+          bash scripts/audit-casks.sh careerrat
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Casks/careerrat.rb

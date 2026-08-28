@@ -56,11 +56,6 @@ brew install --cask codeswhat/tap/portwing
 brew install --cask codeswhat/tap/sockguard
 ```
 
-> [!NOTE]
-> The Sockguard cask will become available with the first stable Sockguard
-> release that includes Homebrew publishing. Until then, its install command
-> returns `Cask 'sockguard' is unavailable`.
-
 If you prefer a review-first flow, add the tap, inspect the cask as plain text,
 then trust only the cask you intend to install:
 
@@ -233,12 +228,32 @@ generator in the source project so the next release preserves the change.
 ```
 
 > [!NOTE]
-> The careerrat cask is currently maintained by hand, because the CareerRat
-> project does not yet have release tooling that generates a cask. Its file
-> header identifies it as hand-written rather than generated. It will move to
-> the generated model described above once that tooling lands. The "do not
-> edit a generated cask by hand" guidance still applies to every other cask in
-> this tap.
+> The careerrat cask is generated the same way, by
+> `scripts/generate-homebrew-cask.sh` in the CareerRat project, but it reaches
+> this tap by being pulled rather than pushed. A scheduled workflow here,
+> [`update-careerrat-cask.yml`](.github/workflows/update-careerrat-cask.yml),
+> watches for a new published CareerRat release, runs that generator against
+> it, and commits the result. The "do not edit a generated cask by hand"
+> guidance applies to it exactly as it does to the rest.
+
+Two checks in this repository verify the result, because a cask that is pushed
+here by another project's tooling is otherwise unexamined until a user hits it:
+
+- [`cask-ci.yml`](.github/workflows/cask-ci.yml) audits every cask on each pull
+  request and each push to `main`, so a malformed cask is caught in seconds
+  rather than in a bug report.
+- [`cask-drift-sentinel.yml`](.github/workflows/cask-drift-sentinel.yml) runs
+  daily and fails if any cask has fallen behind the latest release of the
+  project that owns it, or if any download URL has stopped resolving.
+
+Both are plain scripts under [`scripts/`](scripts/) and can be run locally. The
+drift check needs an authenticated GitHub CLI (`gh auth login`, or `GH_TOKEN`
+set) to read each project's releases; the audit needs Homebrew:
+
+```bash
+bash scripts/check-cask-drift.sh
+bash scripts/audit-casks.sh --online
+```
 
 <hr>
 

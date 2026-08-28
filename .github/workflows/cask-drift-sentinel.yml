@@ -1,0 +1,61 @@
+name: cask-drift-sentinel
+
+# Answers one question daily: does every cask in this tap still match the
+# release it is supposed to be serving?
+#
+# Only the careerrat cask has a pusher in this repository. portwing, sockguard
+# and idlescreen are committed here by their own projects' release tooling, so
+# if one of those pushes stops happening there is nothing on this side that
+# notices -- the tap just keeps serving an old version, indefinitely and
+# silently. This job is the thing that notices. It is deliberately blind to how
+# a cask gets updated, and checks only that it matches.
+#
+# On divergence the job fails, which surfaces as a red run on the repository.
+# It does not open an issue: this org's issue trackers are for reports from
+# users, not for findings automation produced.
+
+on:
+  schedule:
+    - cron: "41 7 * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  versions:
+    name: cask versions match upstream releases
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Harden the runner (audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compare every cask against its upstream release
+        run: bash scripts/check-cask-drift.sh
+
+  urls:
+    name: cask download URLs still resolve
+    # Separate from the version check on purpose. A version can be correct
+    # while the asset it points at has been renamed or deleted, and this pass
+    # is slow and network-dependent enough that it should not be able to mask
+    # the fast check above.
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Audit the casks against live download URLs
+        run: bash scripts/audit-casks.sh --online
