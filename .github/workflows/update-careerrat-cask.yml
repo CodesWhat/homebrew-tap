@@ -29,6 +29,10 @@ jobs:
     # native here (it calls node solely to read package.json when --version is
     # omitted, and this workflow always passes it).
     runs-on: macos-latest
+    # Observed at under a minute, including the release download the generator
+    # hashes. This is the one job here that can push to main, so leaving it
+    # able to sit wedged for six hours is the worst of the four.
+    timeout-minutes: 20
     permissions:
       contents: write
     env:

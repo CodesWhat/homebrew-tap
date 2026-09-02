@@ -25,6 +25,10 @@ jobs:
   versions:
     name: cask versions match upstream releases
     runs-on: ubuntu-latest
+    # Four `gh release list` calls; observed runtime is under 30 seconds. The
+    # ceiling is a runaway guard, not a performance budget, so it sits well
+    # above that rather than near it.
+    timeout-minutes: 10
     permissions:
       contents: read
     env:
@@ -47,6 +51,11 @@ jobs:
     # is slow and network-dependent enough that it should not be able to mask
     # the fast check above.
     runs-on: macos-latest
+    # Observed runtime is around 2m30s. Generous because this pass downloads
+    # from every url stanza and a slow upstream is not a failure, but bounded
+    # because a wedged download here burns macOS minutes at 10x until the
+    # 6-hour default fires.
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -58,4 +67,21 @@ jobs:
         with:
           persist-credentials: false
       - name: Audit the casks against live download URLs
+        # Scoped to this step rather than the job: nothing above it needs a
+        # GitHub credential, and harden-runner and checkout should not be
+        # handed one they have no use for.
+        #
+        # `brew audit --online` resolves every GitHub release asset through
+        # the API. Unauthenticated that is 60 requests an hour counted against
+        # the runner's shared egress IP rather than against this repository,
+        # so the quota is routinely already spent by someone else's job on the
+        # same host and this one fails naming whichever cask it happened to
+        # reach first. It failed that way on 2026-08-30 (careerrat,
+        # idlescreen, portwing) and 2026-09-02 (sockguard), which reads as
+        # four separate cask problems and is one credential problem.
+        #
+        # Homebrew reads this variable specifically. GH_TOKEN, which the
+        # version job above sets so `gh` can authenticate, does nothing here.
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/audit-casks.sh --online
