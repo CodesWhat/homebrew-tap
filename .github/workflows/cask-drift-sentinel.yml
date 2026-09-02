@@ -49,6 +49,19 @@ jobs:
     runs-on: macos-latest
     permissions:
       contents: read
+    env:
+      # `brew audit --online` resolves every GitHub release asset through the
+      # API. Unauthenticated that is 60 requests an hour counted against the
+      # runner's shared egress IP rather than against this repository, so the
+      # quota is routinely already spent by someone else's job on the same
+      # host and this one fails naming whichever cask it happened to reach
+      # first. It failed that way on 2026-08-30 (careerrat, idlescreen,
+      # portwing) and 2026-09-02 (sockguard), which reads as four separate
+      # cask problems and is one credential problem.
+      #
+      # Homebrew reads this variable specifically. GH_TOKEN, which the version
+      # job above sets so `gh` can authenticate, does nothing for brew.
+      HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Harden the runner (audit all outbound calls)
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
