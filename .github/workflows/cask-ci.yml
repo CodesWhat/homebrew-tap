@@ -42,6 +42,9 @@ jobs:
     # macOS because the tap ships macOS-only casks; `brew audit --cask` needs a
     # macOS host to evaluate their depends_on stanzas honestly.
     runs-on: macos-latest
+    # Offline audit, observed at under 90 seconds. See cask-drift-sentinel.yml
+    # for why every job in this repo carries a ceiling.
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:

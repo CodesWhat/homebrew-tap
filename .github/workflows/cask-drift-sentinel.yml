@@ -25,6 +25,10 @@ jobs:
   versions:
     name: cask versions match upstream releases
     runs-on: ubuntu-latest
+    # Four `gh release list` calls; observed runtime is under 30 seconds. The
+    # ceiling is a runaway guard, not a performance budget, so it sits well
+    # above that rather than near it.
+    timeout-minutes: 10
     permissions:
       contents: read
     env:
@@ -47,6 +51,11 @@ jobs:
     # is slow and network-dependent enough that it should not be able to mask
     # the fast check above.
     runs-on: macos-latest
+    # Observed runtime is around 2m30s. Generous because this pass downloads
+    # from every url stanza and a slow upstream is not a failure, but bounded
+    # because a wedged download here burns macOS minutes at 10x until the
+    # 6-hour default fires.
+    timeout-minutes: 30
     permissions:
       contents: read
     env:
