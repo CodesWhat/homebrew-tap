@@ -2,8 +2,8 @@
 # is still opened by hand, see docs/RELEASE.md's "Updating the Homebrew
 # Cask" section.
 cask "careerrat" do
-  version "0.18.0"
-  sha256 "3c0734b5fbf23381713626d2b3da3e71c3d54ddb10a8fbf660364f299f237407"
+  version "0.18.1"
+  sha256 "6453e473c5391fa4a3bb1ce227f098b97bc2436f0343c90c5423224dc4330551"
 
   url "https://github.com/CodesWhat/careerrat/releases/download/v#{version}/CareerRat-#{version}-arm64.dmg"
   name "CareerRat"
