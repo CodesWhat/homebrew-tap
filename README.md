@@ -49,6 +49,9 @@ brew install --cask codeswhat/tap/careerrat
 # idlescreen
 brew install --cask codeswhat/tap/idlescreen
 
+# Mouthtype
+brew install --cask codeswhat/tap/mouthtype
+
 # Portwing
 brew install --cask codeswhat/tap/portwing
 
@@ -77,6 +80,7 @@ You can also review every published definition directly in
 | --- | --- | --- | --- |
 | [CareerRat](https://github.com/CodesWhat/careerrat) | Local, offline-first job-search workspace | [Documentation](https://careerrat.com/docs) | Available now |
 | [idlescreen](https://github.com/CodesWhat/idlescreen) | Metal-rendered ASCII art screen saver and companion Studio for macOS | [README](https://github.com/CodesWhat/idlescreen#readme) | Available now |
+| [Mouthtype](https://github.com/CodesWhat/mouthtype) | Local voice dictation with on-device cleanup | [Getting started](https://mouthtype.app/start/) | Available now |
 | [Portwing](https://github.com/CodesWhat/portwing) | Security-first remote Docker agent for Drydock and standalone API clients | [Installation guide](https://github.com/CodesWhat/portwing/blob/main/docs/content/docs/installation.mdx) | Available now |
 | [Sockguard](https://github.com/CodesWhat/sockguard) | Default-deny Docker socket proxy with granular request filtering and audit logging | [Getting started](https://getsockguard.com/docs/getting-started) | Available now |
 
@@ -94,6 +98,7 @@ Refresh Homebrew metadata and upgrade an installed product:
 brew update
 brew upgrade --cask careerrat
 brew upgrade --cask idlescreen
+brew upgrade --cask mouthtype
 brew upgrade --cask portwing
 brew upgrade --cask sockguard
 ```
@@ -112,6 +117,7 @@ Uninstall a product:
 ```bash
 brew uninstall --cask careerrat
 brew uninstall --cask idlescreen
+brew uninstall --cask mouthtype
 brew uninstall --cask portwing
 brew uninstall --cask sockguard
 ```
@@ -137,6 +143,7 @@ tap "codeswhat/tap"
 
 cask "codeswhat/tap/careerrat", trusted: true
 cask "codeswhat/tap/idlescreen", trusted: true
+cask "codeswhat/tap/mouthtype", trusted: true
 cask "codeswhat/tap/portwing", trusted: true
 cask "codeswhat/tap/sockguard", trusted: true
 ```
@@ -166,6 +173,9 @@ requirements.
 
 idlescreen is a universal macOS application for Apple silicon and Intel. It
 requires macOS 26 Tahoe or later and is not available on Linux.
+
+Mouthtype is a macOS application for Apple silicon only. There is no Intel
+build. It requires macOS 26 Tahoe or later and is not available on Linux.
 
 CareerRat is a macOS application for Apple silicon only. There is no Intel
 build. It requires macOS 12 Monterey or later and is not available on Linux.
@@ -197,6 +207,7 @@ Project-specific signing, provenance, SBOM, and runtime-security documentation
 lives with the project:
 
 - [CareerRat release process](https://github.com/CodesWhat/careerrat/blob/main/docs/RELEASE.md)
+- [Mouthtype security policy](https://github.com/CodesWhat/mouthtype/blob/main/SECURITY.md)
 - [Portwing release verification](https://github.com/CodesWhat/portwing/blob/main/docs/content/docs/verification.mdx)
 - [Sockguard documentation](https://getsockguard.com/docs)
 - [idlescreen building and release verification](https://github.com/CodesWhat/idlescreen/blob/main/docs/BUILDING.md)
@@ -228,13 +239,15 @@ generator in the source project so the next release preserves the change.
 ```
 
 > [!NOTE]
-> The careerrat cask is generated the same way, by
-> `scripts/generate-homebrew-cask.sh` in the CareerRat project, but it reaches
-> this tap by being pulled rather than pushed. A scheduled workflow here,
-> [`update-careerrat-cask.yml`](.github/workflows/update-careerrat-cask.yml),
-> watches for a new published CareerRat release, runs that generator against
-> it, and commits the result. The "do not edit a generated cask by hand"
-> guidance applies to it exactly as it does to the rest.
+> The careerrat and mouthtype casks are generated the same way, by
+> `scripts/generate-homebrew-cask.sh` in the CareerRat and Mouthtype projects,
+> but they reach this tap by being pulled rather than pushed. Scheduled
+> workflows here,
+> [`update-careerrat-cask.yml`](.github/workflows/update-careerrat-cask.yml)
+> and [`update-mouthtype-cask.yml`](.github/workflows/update-mouthtype-cask.yml),
+> watch for a new published release, run that generator against it, and
+> commit the result. The "do not edit a generated cask by hand" guidance
+> applies to them exactly as it does to the rest.
 
 Two checks in this repository verify the result, because a cask that is pushed
 here by another project's tooling is otherwise unexamined until a user hits it:
@@ -313,6 +326,7 @@ Use the issue tracker that owns the problem:
 | Tap discovery, download, checksum, or Homebrew installation | [CodesWhat/homebrew-tap issues](https://github.com/CodesWhat/homebrew-tap/issues) |
 | CareerRat behavior or configuration | [CodesWhat/careerrat issues](https://github.com/CodesWhat/careerrat/issues) |
 | idlescreen behavior or configuration | [CodesWhat/idlescreen issues](https://github.com/CodesWhat/idlescreen/issues) |
+| Mouthtype behavior or configuration | [CodesWhat/mouthtype issues](https://github.com/CodesWhat/mouthtype/issues) |
 | Portwing behavior or configuration | [CodesWhat/portwing issues](https://github.com/CodesWhat/portwing/issues) |
 | Sockguard behavior or policy configuration | [CodesWhat/sockguard issues](https://github.com/CodesWhat/sockguard/issues) |
 | Private security vulnerability | The security-reporting process in the affected project's `SECURITY.md` |

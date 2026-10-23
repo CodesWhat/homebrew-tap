@@ -1,0 +1,101 @@
+name: update-mouthtype-cask
+
+# Watches CodesWhat/mouthtype for a new published release and updates
+# Casks/mouthtype.rb to match, committing directly to main the same way the
+# goreleaser-managed casks (sockguard, portwing) already land here. The cask
+# body comes from mouthtype's own scripts/generate-homebrew-cask.sh, which
+# downloads the published release DMG and hashes it, so the sha256 provably
+# matches what users download.
+#
+# Runs on a schedule and on manual dispatch. Uses only this repo's
+# GITHUB_TOKEN; no cross-repo credential exists on either side. If the cask
+# already matches the latest release, every run is a clean no-op.
+#
+# The generator is read from mouthtype's default branch, so a release newer
+# than the cask needs scripts/generate-homebrew-cask.sh to have reached main
+# there first.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  update-cask:
+    name: update the mouthtype cask
+    # macOS so the generated cask can be audited here, before it is pushed,
+    # rather than after users can already install it. A push made with the
+    # default GITHUB_TOKEN does not start other workflows, so cask-ci cannot
+    # cover this cask from the outside; gating in-place is the fix. The
+    # generator needs only bash, curl, shasum, awk and grep, all of which are
+    # native here (it calls PlistBuddy solely to read packaging/Version.plist
+    # when --version is omitted, and this workflow always passes it).
+    runs-on: macos-latest
+    # Observed at under a minute, including the release download the generator
+    # hashes. This is the one job here that can push to main, so leaving it
+    # able to sit wedged for six hours is the worst of the four.
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Harden the runner (audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      # persist-credentials stays on for this checkout on purpose: the last
+      # step pushes the cask bump back to this repo's main.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: CodesWhat/mouthtype
+          path: mouthtype-src
+          persist-credentials: false
+      - name: Resolve the latest published mouthtype release
+        id: release
+        run: |
+          set -euo pipefail
+          tag="$(gh release list --repo CodesWhat/mouthtype --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')"
+          if [ -z "$tag" ]; then
+            echo "No published release found; nothing to do."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="${tag#v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Latest release tag '$tag' does not match vX.Y.Z"
+            exit 1
+          fi
+          # Read the version stanza specifically. Matching the first three-part
+          # number anywhere in the file happens to work today only because
+          # `version` is the first such number; a comment mentioning a version
+          # above it would wedge this into a permanent, green no-op.
+          current="$(sed -n 's/^[[:space:]]*version "\([^"]*\)".*/\1/p' Casks/mouthtype.rb | head -1 | cut -d, -f1 || true)"
+          if [ "$version" = "$current" ]; then
+            echo "Cask already at $version; nothing to do."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Regenerate the cask and commit it to main
+        if: steps.release.outputs.version != ''
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          mouthtype-src/scripts/generate-homebrew-cask.sh --version "$VERSION" --write Casks/mouthtype.rb
+          if git diff --quiet -- Casks/mouthtype.rb; then
+            echo "Generated cask is identical; nothing to commit."
+            exit 0
+          fi
+          # Audit before publishing. Scoped to mouthtype so an unrelated cask
+          # that another project pushed broken cannot block this release.
+          bash scripts/audit-casks.sh mouthtype
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/mouthtype.rb
+          git commit -m "build(cask): update mouthtype to $VERSION"
+          git push origin HEAD:main
