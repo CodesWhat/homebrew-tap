@@ -9,7 +9,13 @@ name: update-mouthtype-cask
 #
 # Runs on a schedule and on manual dispatch. Uses only this repo's
 # GITHUB_TOKEN; no cross-repo credential exists on either side. If the cask
-# already matches the latest release, every run is a clean no-op.
+# already matches the latest release, every run is a clean no-op. The cask is
+# audited before it is pushed.
+#
+# Generation and publishing are separate jobs. Generation runs upstream code
+# (the generator script from the other repo) and `brew audit` evaluates the
+# generated Ruby, so it only gets a read-only token. Publishing holds the write
+# credential, so the credential is never present while upstream code runs.
 #
 # The generator is read from mouthtype's default branch, so a release newer
 # than the cask needs scripts/generate-homebrew-cask.sh to have reached main
@@ -23,32 +29,35 @@ on:
 permissions: {}
 
 jobs:
-  update-cask:
-    name: update the mouthtype cask
+  generate:
+    name: generate the mouthtype cask
     # macOS so the generated cask can be audited here, before it is pushed,
     # rather than after users can already install it. A push made with the
     # default GITHUB_TOKEN does not start other workflows, so cask-ci cannot
     # cover this cask from the outside; gating in-place is the fix. The
     # generator needs only bash, curl, shasum, awk and grep, all of which are
-    # native here (it calls PlistBuddy solely to read packaging/Version.plist
-    # when --version is omitted, and this workflow always passes it).
+    # native here (it calls PlistBuddy solely to read packaging/Version.plist when
+    # --version is omitted, and this workflow always passes it).
     runs-on: macos-latest
     # Observed at under a minute, including the release download the generator
-    # hashes. This is the one job here that can push to main, so leaving it
-    # able to sit wedged for six hours is the worst of the four.
+    # hashes. Leaving it able to sit wedged for six hours is the worst of the
+    # four.
     timeout-minutes: 20
     permissions:
-      contents: write
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      contents: read
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      changed: ${{ steps.cask.outputs.changed }}
     steps:
       - name: Harden the runner (audit all outbound calls)
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           egress-policy: audit
-      # persist-credentials stays on for this checkout on purpose: the last
-      # step pushes the cask bump back to this repo's main.
+      # No credential is persisted: this job runs upstream code, and the push
+      # happens in the publish job.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: CodesWhat/mouthtype
@@ -56,12 +65,15 @@ jobs:
           persist-credentials: false
       - name: Resolve the latest published mouthtype release
         id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           tag="$(gh release list --repo CodesWhat/mouthtype --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')"
           if [ -z "$tag" ]; then
             echo "No published release found; nothing to do."
             echo "version=" >> "$GITHUB_OUTPUT"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           version="${tag#v}"
@@ -77,10 +89,12 @@ jobs:
           if [ "$version" = "$current" ]; then
             echo "Cask already at $version; nothing to do."
             echo "version=" >> "$GITHUB_OUTPUT"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Regenerate the cask and commit it to main
+      - name: Regenerate and audit the cask
+        id: cask
         if: steps.release.outputs.version != ''
         env:
           VERSION: ${{ steps.release.outputs.version }}
@@ -89,13 +103,75 @@ jobs:
           mouthtype-src/scripts/generate-homebrew-cask.sh --version "$VERSION" --write Casks/mouthtype.rb
           if git diff --quiet -- Casks/mouthtype.rb; then
             echo "Generated cask is identical; nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # Audit before publishing. Scoped to mouthtype so an unrelated cask
           # that another project pushed broken cannot block this release.
           bash scripts/audit-casks.sh mouthtype
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Upload the generated cask
+        if: steps.cask.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mouthtype-cask
+          path: Casks/mouthtype.rb
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    name: publish the mouthtype cask
+    needs: generate
+    if: needs.generate.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Harden the runner (audit all outbound calls)
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: mouthtype-cask
+          path: ${{ runner.temp }}/cask
+      # This job never runs upstream code and never evaluates the cask; it only
+      # checks the file's shape and version, then commits it. The push
+      # credential exists only for the push command and is never written to
+      # .git/config.
+      - name: Verify and commit the generated cask
+        env:
+          VERSION: ${{ needs.generate.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/cask/mouthtype.rb"
+          if [ ! -f "$src" ]; then
+            echo "::error::Generated cask artifact is missing"
+            exit 1
+          fi
+          first="$(grep -Ev '^[[:space:]]*(#|$)' "$src" | head -1 || true)"
+          if [ "$first" != 'cask "mouthtype" do' ]; then
+            echo "::error::Generated cask does not start with 'cask \"mouthtype\" do'"
+            exit 1
+          fi
+          generated="$(sed -n 's/^[[:space:]]*version "\([^"]*\)".*/\1/p' "$src" | head -1 | cut -d, -f1)"
+          if [ "$generated" != "$VERSION" ]; then
+            echo "::error::Generated cask version '$generated' does not match release '$VERSION'"
+            exit 1
+          fi
+          cp "$src" Casks/mouthtype.rb
+          if git diff --quiet -- Casks/mouthtype.rb; then
+            echo "Cask already matches; nothing to commit."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Casks/mouthtype.rb
           git commit -m "build(cask): update mouthtype to $VERSION"
-          git push origin HEAD:main
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin HEAD:main
