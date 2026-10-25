@@ -109,7 +109,9 @@ See what is currently installed:
 brew list --cask
 brew info --cask codeswhat/tap/careerrat
 brew info --cask codeswhat/tap/idlescreen
+brew info --cask codeswhat/tap/mouthtype
 brew info --cask codeswhat/tap/portwing
+brew info --cask codeswhat/tap/sockguard
 ```
 
 Uninstall a product:
@@ -178,7 +180,7 @@ Mouthtype is a macOS application for Apple silicon only. There is no Intel
 build. It requires macOS 26 Tahoe or later and is not available on Linux.
 
 CareerRat is a macOS application for Apple silicon only. There is no Intel
-build. It requires macOS 12 Monterey or later and is not available on Linux.
+build. It requires macOS 13 Ventura or later and is not available on Linux.
 
 <hr>
 
