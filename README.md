@@ -46,6 +46,9 @@ also trusts only that cask rather than every current and future item in the tap.
 # CareerRat
 brew install --cask codeswhat/tap/careerrat
 
+# Dilated
+brew install --cask codeswhat/tap/dilated
+
 # idlescreen
 brew install --cask codeswhat/tap/idlescreen
 
@@ -79,6 +82,7 @@ You can also review every published definition directly in
 | Product | What it does | Documentation | Availability |
 | --- | --- | --- | --- |
 | [CareerRat](https://github.com/CodesWhat/careerrat) | Local, offline-first job-search workspace | [Documentation](https://careerrat.com/docs) | Available now |
+| [Dilated](https://github.com/CodesWhat/dilated) | Menu bar keep-awake app for macOS 26 on Apple silicon, with triggers, agent holds and closed-lid mode | [Website](https://dilated.codeswhat.com/) | Public beta |
 | [idlescreen](https://github.com/CodesWhat/idlescreen) | Metal-rendered ASCII art screen saver and companion Studio for macOS | [README](https://github.com/CodesWhat/idlescreen#readme) | Available now |
 | [Mouthtype](https://github.com/CodesWhat/mouthtype) | Local voice dictation with on-device cleanup | [Getting started](https://mouthtype.app/start/) | Available now |
 | [Portwing](https://github.com/CodesWhat/portwing) | Security-first remote Docker agent for Drydock and standalone API clients | [Installation guide](https://github.com/CodesWhat/portwing/blob/main/docs/content/docs/installation.mdx) | Available now |
@@ -97,6 +101,7 @@ Refresh Homebrew metadata and upgrade an installed product:
 ```bash
 brew update
 brew upgrade --cask careerrat
+brew upgrade --cask dilated
 brew upgrade --cask idlescreen
 brew upgrade --cask mouthtype
 brew upgrade --cask portwing
@@ -108,6 +113,7 @@ See what is currently installed:
 ```bash
 brew list --cask
 brew info --cask codeswhat/tap/careerrat
+brew info --cask codeswhat/tap/dilated
 brew info --cask codeswhat/tap/idlescreen
 brew info --cask codeswhat/tap/mouthtype
 brew info --cask codeswhat/tap/portwing
@@ -118,6 +124,7 @@ Uninstall a product:
 
 ```bash
 brew uninstall --cask careerrat
+brew uninstall --cask dilated
 brew uninstall --cask idlescreen
 brew uninstall --cask mouthtype
 brew uninstall --cask portwing
@@ -144,6 +151,7 @@ Use a `Brewfile` to make CodesWhat software installation reproducible:
 tap "codeswhat/tap"
 
 cask "codeswhat/tap/careerrat", trusted: true
+cask "codeswhat/tap/dilated", trusted: true
 cask "codeswhat/tap/idlescreen", trusted: true
 cask "codeswhat/tap/mouthtype", trusted: true
 cask "codeswhat/tap/portwing", trusted: true
@@ -181,6 +189,10 @@ build. It requires macOS 26 Tahoe or later and is not available on Linux.
 
 CareerRat is a macOS application for Apple silicon only. There is no Intel
 build. It requires macOS 13 Ventura or later and is not available on Linux.
+
+Dilated is a macOS application for Apple silicon only and requires macOS 26
+Tahoe or later. The current cask is a public beta; its caveats list the
+hardware checks that have not been verified yet.
 
 <hr>
 
