@@ -61,7 +61,27 @@ if [ -e "$tap_dir" ] || [ -L "$tap_dir" ]; then
 fi
 mkdir -p "$(dirname "$tap_dir")"
 ln -s "$PWD" "$tap_dir"
-trap 'rm -f "$tap_dir"; rmdir "$(dirname "$tap_dir")" 2>/dev/null || true' EXIT
+audit_config=""
+trap '
+  rm -f "$tap_dir"
+  rmdir "$(dirname "$tap_dir")" 2>/dev/null || true
+  [ -z "$audit_config" ] || rm -rf "$audit_config"
+' EXIT
+
+# Trust only the selected casks in a disposable config, leaving user trust alone.
+audit_config="$(mktemp -d)"
+mkdir -p "$audit_config/homebrew"
+if [ -n "${XDG_CONFIG_HOME:-${HOMEBREW_XDG_CONFIG_HOME:-}}" ]; then
+  brew_env="${XDG_CONFIG_HOME:-$HOMEBREW_XDG_CONFIG_HOME}/homebrew/brew.env"
+else
+  brew_env="$HOME/.homebrew/brew.env"
+fi
+if [ -f "$brew_env" ]; then
+  cp "$brew_env" "$audit_config/homebrew/brew.env"
+fi
+run_brew() {
+  XDG_CONFIG_HOME="$audit_config" brew "$@"
+}
 
 # --os/--arch because this tap carries both arm64-only casks and casks with
 # separate on_intel and on_arm blocks. Left to itself brew audits only the
@@ -74,7 +94,8 @@ fi
 status=0
 for token in "${tokens[@]}"; do
   printf '=== %s ===\n' "$token"
-  if brew audit "${audit_args[@]}" "$tap_name/$token"; then
+  if run_brew trust --cask "$tap_name/$token" &&
+    run_brew audit "${audit_args[@]}" "$tap_name/$token"; then
     printf 'ok     %s\n' "$token"
   else
     printf 'FAILED %s\n' "$token"
