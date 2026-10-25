@@ -6,6 +6,7 @@
 # Usage:
 #   bash scripts/audit-casks.sh                  # offline, every cask
 #   bash scripts/audit-casks.sh --online         # also verify URLs resolve
+#   bash scripts/audit-casks.sh --min-os careerrat # released app's minimum macOS
 #   bash scripts/audit-casks.sh careerrat        # just one cask
 #
 # The offline pass is fast and has no network dependency, so it is the gate on
@@ -26,10 +27,11 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 online=0
-if [ "${1:-}" = "--online" ]; then
-  online=1
-  shift
-fi
+min_os=0
+case "${1:-}" in
+  --online) online=1; shift ;;
+  --min-os) online=1; min_os=1; shift ;;
+esac
 
 # With no arguments, audit the whole tap. Named tokens audit just those, so a
 # release automation can gate on the one cask it is about to publish without
@@ -61,7 +63,27 @@ if [ -e "$tap_dir" ] || [ -L "$tap_dir" ]; then
 fi
 mkdir -p "$(dirname "$tap_dir")"
 ln -s "$PWD" "$tap_dir"
-trap 'rm -f "$tap_dir"; rmdir "$(dirname "$tap_dir")" 2>/dev/null || true' EXIT
+audit_config=""
+trap '
+  rm -f "$tap_dir"
+  rmdir "$(dirname "$tap_dir")" 2>/dev/null || true
+  [ -z "$audit_config" ] || rm -rf "$audit_config"
+' EXIT
+
+# Trust only the selected casks in a disposable config, leaving user trust alone.
+audit_config="$(mktemp -d)"
+mkdir -p "$audit_config/homebrew"
+if [ -n "${XDG_CONFIG_HOME:-${HOMEBREW_XDG_CONFIG_HOME:-}}" ]; then
+  brew_env="${XDG_CONFIG_HOME:-$HOMEBREW_XDG_CONFIG_HOME}/homebrew/brew.env"
+else
+  brew_env="$HOME/.homebrew/brew.env"
+fi
+if [ -f "$brew_env" ]; then
+  cp "$brew_env" "$audit_config/homebrew/brew.env"
+fi
+run_brew() {
+  XDG_CONFIG_HOME="$audit_config" brew "$@"
+}
 
 # --os/--arch because this tap carries both arm64-only casks and casks with
 # separate on_intel and on_arm blocks. Left to itself brew audits only the
@@ -70,11 +92,15 @@ audit_args=(--cask --os=macos --arch=all)
 if [ "$online" -eq 1 ]; then
   audit_args+=(--online)
 fi
+if [ "$min_os" -eq 1 ]; then
+  audit_args+=(--only min_os)
+fi
 
 status=0
 for token in "${tokens[@]}"; do
   printf '=== %s ===\n' "$token"
-  if brew audit "${audit_args[@]}" "$tap_name/$token"; then
+  if run_brew trust --cask "$tap_name/$token" &&
+    run_brew audit "${audit_args[@]}" "$tap_name/$token"; then
     printf 'ok     %s\n' "$token"
   else
     printf 'FAILED %s\n' "$token"
