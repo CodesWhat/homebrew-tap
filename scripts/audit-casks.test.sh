@@ -57,6 +57,10 @@ bash "$fixture/repo/scripts/audit-casks.sh" careerrat
 [ "$(cat "$fixture/user-config/homebrew/trust.json")" = 'preserve user trust' ]
 [ ! -e "$(cat "$fixture/scoped-config")" ]
 
+bash "$fixture/repo/scripts/audit-casks.sh" --min-os careerrat
+grep -qx 'audit --cask --os=macos --arch=all --online --only min_os codeswhat-ci/tap/careerrat' "$fixture/audit-args"
+[ ! -e "$(cat "$fixture/scoped-config")" ]
+
 export AUDIT_FIXTURE_EXIT=1
 if bash "$fixture/repo/scripts/audit-casks.sh" --online careerrat; then
   echo 'Expected failed audit to propagate' >&2

@@ -17,7 +17,7 @@ cask "careerrat" do
 
   depends_on arch: :arm64
   # Matches LSMinimumSystemVersion baked into the app by electron-builder.
-  depends_on macos: :monterey
+  depends_on macos: :ventura
 
   app "CareerRat.app"
 

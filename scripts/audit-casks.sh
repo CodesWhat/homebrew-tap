@@ -6,6 +6,7 @@
 # Usage:
 #   bash scripts/audit-casks.sh                  # offline, every cask
 #   bash scripts/audit-casks.sh --online         # also verify URLs resolve
+#   bash scripts/audit-casks.sh --min-os careerrat # released app's minimum macOS
 #   bash scripts/audit-casks.sh careerrat        # just one cask
 #
 # The offline pass is fast and has no network dependency, so it is the gate on
@@ -26,10 +27,11 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 online=0
-if [ "${1:-}" = "--online" ]; then
-  online=1
-  shift
-fi
+min_os=0
+case "${1:-}" in
+  --online) online=1; shift ;;
+  --min-os) online=1; min_os=1; shift ;;
+esac
 
 # With no arguments, audit the whole tap. Named tokens audit just those, so a
 # release automation can gate on the one cask it is about to publish without
@@ -89,6 +91,9 @@ run_brew() {
 audit_args=(--cask --os=macos --arch=all)
 if [ "$online" -eq 1 ]; then
   audit_args+=(--online)
+fi
+if [ "$min_os" -eq 1 ]; then
+  audit_args+=(--only min_os)
 fi
 
 status=0

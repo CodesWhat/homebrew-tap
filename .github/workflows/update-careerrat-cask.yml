@@ -80,6 +80,7 @@ jobs:
         if: steps.release.outputs.version != ''
         env:
           VERSION: ${{ steps.release.outputs.version }}
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           careerrat-src/scripts/generate-homebrew-cask.sh --version "$VERSION" --write Casks/careerrat.rb
@@ -87,9 +88,10 @@ jobs:
             echo "Generated cask is identical; nothing to commit."
             exit 0
           fi
-          # Audit before publishing. Scoped to careerrat so an unrelated cask
-          # that another project pushed broken cannot block this release.
+          # Validate metadata and the released app's minimum OS before publishing.
+          # Full URL availability checks remain in the daily sentinel.
           bash scripts/audit-casks.sh careerrat
+          bash scripts/audit-casks.sh --min-os careerrat
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Casks/careerrat.rb
