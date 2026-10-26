@@ -3,12 +3,15 @@
 # Compares every cask's pinned version against the latest published release of
 # the project that owns it, and fails if any of them have diverged.
 #
-# This is deliberately independent of HOW a cask gets updated. The careerrat
-# and mouthtype casks are pushed by workflows in this repository; dilated,
-# portwing, sockguard and idlescreen are committed here by their own projects'
-# release tooling. If one of those pushes silently stops happening, nothing
-# else in this repository notices, and the tap keeps serving an old version.
-# This script is the check that notices.
+# This is deliberately independent of HOW a cask gets updated. The mouthtype
+# cask is pulled by a workflow in this repository; careerrat is frozen and
+# deprecated; dilated, portwing, sockguard and idlescreen are committed here by
+# their own projects' release tooling. If one of those pushes silently stops
+# happening, nothing else in this repository notices, and the tap keeps serving
+# an old version. This script is the check that notices.
+#
+# A deprecated cask (a line starting with deprecate!) is skipped, because it
+# intentionally stops following upstream.
 #
 # The tap is stable-only, with one named exception mechanism: a token listed in
 # audit_exceptions/github_prerelease_allowlist.json is compared against the
@@ -86,6 +89,11 @@ for cask in Casks/*.rb; do
   if [ -z "$pinned" ]; then
     printf 'ERROR  %-12s no version stanza found in %s\n' "$token" "$cask"
     status=1
+    continue
+  fi
+
+  if grep -Eq '^[[:space:]]*deprecate!' "$cask"; then
+    printf 'skip   %-12s %s (deprecated, not compared)\n' "$token" "$pinned"
     continue
   fi
 
