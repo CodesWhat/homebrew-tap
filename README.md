@@ -244,7 +244,7 @@ release tooling. On each stable release, the source project:
 4. commits the generated cask to this repository; and
 5. smoke-tests installation from `codeswhat/tap` on a clean runner.
 
-Snapshots and prereleases do not update the tap. Each cask header identifies
+Snapshots and prereleases do not update the tap, with one named exception: Dilated ships as a public beta from GitHub pre-releases until 1.0.0, listed in [`audit_exceptions/github_prerelease_allowlist.json`](audit_exceptions/github_prerelease_allowlist.json). Homebrew's audit fails once Dilated publishes a stable release, which forces the exception's removal. Each cask header identifies
 the generator that owns it. Do not edit a generated cask by hand. Fix the
 generator in the source project so the next release preserves the change.
 

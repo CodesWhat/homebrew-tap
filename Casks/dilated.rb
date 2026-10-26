@@ -6,6 +6,11 @@ cask "dilated" do
   name "Dilated"
   desc "Keep your Mac awake, with reasons"
   homepage "https://dilated.codeswhat.com/"
+
+  livecheck do
+    skip "Public beta; versions are tracked by scripts/check-cask-drift.sh."
+  end
+
   auto_updates true
   depends_on arch: :arm64
   depends_on macos: :tahoe
