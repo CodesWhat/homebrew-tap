@@ -43,7 +43,9 @@ separate `brew tap` command is not required. Using the fully qualified cask name
 also trusts only that cask rather than every current and future item in the tap.
 
 ```bash
-# CareerRat (deprecated: the last Mac release is 0.19.2; use npm install -g careerrat)
+# CareerRat now ships on npm
+npm install -g careerrat
+# Legacy Mac app, deprecated, last release 0.19.2
 brew install --cask codeswhat/tap/careerrat
 
 # Dilated

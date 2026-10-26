@@ -10,7 +10,7 @@
 # happening, nothing else in this repository notices, and the tap keeps serving
 # an old version. This script is the check that notices.
 #
-# A deprecated cask (a line starting with deprecate!) is skipped, because it
+# A deprecated cask is skipped from its deprecate! date onward, because it
 # intentionally stops following upstream.
 #
 # The tap is stable-only, with one named exception mechanism: a token listed in
@@ -92,8 +92,11 @@ for cask in Casks/*.rb; do
     continue
   fi
 
-  if grep -Eq '^[[:space:]]*deprecate!' "$cask"; then
-    printf 'skip   %-12s %s (deprecated, not compared)\n' "$token" "$pinned"
+  # Homebrew treats a cask as deprecated only from its deprecate! date, so
+  # skip only once that date has arrived. ISO dates compare as strings.
+  deprecated_on="$(sed -n 's/^[[:space:]]*deprecate![[:space:]]*date:[[:space:]]*"\([0-9-]*\)".*/\1/p' "$cask" | head -1)"
+  if [ -n "$deprecated_on" ] && [ ! "$deprecated_on" \> "$(date -u +%Y-%m-%d)" ]; then
+    printf 'skip   %-12s %s (deprecated %s, not compared)\n' "$token" "$pinned" "$deprecated_on"
     continue
   fi
 
