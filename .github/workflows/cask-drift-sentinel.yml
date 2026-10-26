@@ -3,7 +3,8 @@ name: cask-drift-sentinel
 # Answers one question daily: does every cask in this tap still match the
 # release it is supposed to be serving?
 #
-# Only the careerrat cask has a pusher in this repository. portwing, sockguard
+# Only the mouthtype cask has a pusher in this repository (careerrat is frozen
+# and deprecated). portwing, sockguard
 # and idlescreen are committed here by their own projects' release tooling, so
 # if one of those pushes stops happening there is nothing on this side that
 # notices -- the tap just keeps serving an old version, indefinitely and

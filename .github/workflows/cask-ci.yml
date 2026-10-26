@@ -2,7 +2,7 @@ name: cask-ci
 
 # Validates every cask in the tap before, and immediately after, it reaches
 # users. Four separate automations commit to this repository's main branch --
-# the careerrat workflow that lives here, plus GoReleaser in portwing and
+# the mouthtype workflow that lives here, plus GoReleaser in portwing and
 # sockguard and idlescreen's own release job -- and until this workflow existed
 # none of them had anything checking that what they pushed was installable. A
 # malformed cask breaks `brew install` for everyone who has tapped this repo,
@@ -23,7 +23,7 @@ on:
       - "Casks/**"
       - "scripts/**"
       - ".github/workflows/cask-ci.yml"
-  # A push made by update-careerrat-cask.yml with the default GITHUB_TOKEN does
+  # A push made by update-mouthtype-cask.yml with the default GITHUB_TOKEN does
   # not start workflows, so `push` above cannot cover that cask. It audits
   # itself in-place before pushing instead. Using workflow_run to reach across
   # would mean adopting a trigger that runs with the base repository's secrets,
