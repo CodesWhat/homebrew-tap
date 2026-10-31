@@ -1,6 +1,6 @@
 cask "dilated" do
-  version "1.0.0-beta.6"
-  sha256 "36b1e89b5ba97f71a2778568a21aeeed10d8e097d87b2f08842b9e89a064124e"
+  version "1.0.0-beta.7"
+  sha256 "10621bf895b5c15bcdb2fbf21a53c7ddc5725cdbaee3a684b5c90f1a946433ae"
 
   url "https://github.com/CodesWhat/dilated/releases/download/v#{version}/Dilated-#{version}-macos-arm64.dmg"
   name "Dilated"
