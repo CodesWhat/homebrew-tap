@@ -6,25 +6,25 @@ cask "sockguard" do
     end
   end
 
-  version "2.4.1"
+  version "2.4.2"
 
   on_macos do
     on_arm do
-      sha256 "6f8f0f900474fe9dc475bf36df14fdbb60baffc004d7f91a7101180b994da605"
+      sha256 "98455d20fcc96c0ae817e609c194fd329d5f35f173e2ebb2aa3aa9da69f6da05"
       url "https://github.com/CodesWhat/sockguard/releases/download/v#{version}/sockguard_#{version}_darwin_arm64.tar.gz"
     end
     on_intel do
-      sha256 "7e019a4f395005e52167fad1bad6fa2ba17d77bc33ce620d7e0e962c39c2bfeb"
+      sha256 "37f1d0755861612d4ac1162e8df74e4f5e067704bb37e94f506939a0eaa0af43"
       url "https://github.com/CodesWhat/sockguard/releases/download/v#{version}/sockguard_#{version}_darwin_amd64.tar.gz"
     end
   end
   on_linux do
     on_arm do
-      sha256 "757bf00d14fd69c8ca0c72f12cd82547c655a2a95eec1f2183fc27284ddc283d"
+      sha256 "79182a678a7d7c445bfd522185dc0e1547bd9dcb821af8437b5c46f660ccdb89"
       url "https://github.com/CodesWhat/sockguard/releases/download/v#{version}/sockguard_#{version}_linux_arm64.tar.gz"
     end
     on_intel do
-      sha256 "a7408dec4983500e1a7a1965f66f844e2cbdf2f9073e2ac53fae1366ee76bc2c"
+      sha256 "039b19b556eb56979d9ea2191f2ca293ab7f207ed97b9f35fb39fc6eb8a32629"
       url "https://github.com/CodesWhat/sockguard/releases/download/v#{version}/sockguard_#{version}_linux_amd64.tar.gz"
     end
   end
