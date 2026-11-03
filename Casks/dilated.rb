@@ -1,6 +1,6 @@
 cask "dilated" do
-  version "1.0.0-beta.8"
-  sha256 "602a8d36095c640c1de61c8d46b0ed8d93c3f769e4f5ef317f8dce7d8bd6eee9"
+  version "1.0.0-beta.9"
+  sha256 "27a596c8e43a32586d224ceb448243cedac6d561142ef3827469e008a30da732"
 
   url "https://github.com/CodesWhat/dilated/releases/download/v#{version}/Dilated-#{version}-macos-arm64.dmg"
   name "Dilated"
@@ -22,9 +22,11 @@ cask "dilated" do
     run "Dilated.app/Contents/MacOS/dilated", base: :appdir, args: ["package-check"]
   end
 
+  zap delete: "/private/etc/sudoers.d/dilated"
+
   caveats <<~EOS
     Beta release. Closed-lid mode is experimental.
-    Not yet verified on hardware: macOS27ClosedLid, helperCrashRecovery, appCrashRecovery, guardTransitions, rebootRecovery, approvalDenied, helperUpgrade, uninstallNormalSleep, nativeUI.
+    Not yet verified on hardware: sudoRuleRevoked, guardTransitions, rebootRecovery, adminPromptCancelled, helperMigration, uninstallNormalSleep, nativeUI.
 
     Before upgrading, run dilated prepare-update, then brew upgrade --cask dilated.
     Reopen Dilated after the upgrade. Timers keep their original deadlines.
