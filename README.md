@@ -84,7 +84,7 @@ You can also review every published definition directly in
 | Product | What it does | Documentation | Availability |
 | --- | --- | --- | --- |
 | [CareerRat](https://github.com/CodesWhat/careerrat) | Local, offline-first job-search workspace | [Documentation](https://careerrat.com/docs) | Deprecated, use npm |
-| [Dilated](https://github.com/CodesWhat/dilated) | Menu bar keep-awake app for macOS 26 on Apple silicon, with triggers, agent holds and closed-lid mode | [Website](https://dilated.codeswhat.com/) | Public beta |
+| [Dilated](https://github.com/CodesWhat/dilated) | Menu bar keep-awake app for macOS 26 on Apple silicon, with triggers, agent holds and closed-lid mode | [Website](https://dilated.app/) | Public beta |
 | [idlescreen](https://github.com/CodesWhat/idlescreen) | Metal-rendered ASCII art screen saver and companion Studio for macOS | [README](https://github.com/CodesWhat/idlescreen#readme) | Available now |
 | [Mouthtype](https://github.com/CodesWhat/mouthtype) | Local voice dictation with on-device cleanup | [Getting started](https://mouthtype.app/start/) | Available now |
 | [Portwing](https://github.com/CodesWhat/portwing) | Security-first remote Docker agent for Drydock and standalone API clients | [Installation guide](https://github.com/CodesWhat/portwing/blob/main/docs/content/docs/installation.mdx) | Available now |
