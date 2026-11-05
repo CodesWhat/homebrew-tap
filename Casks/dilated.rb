@@ -1,11 +1,11 @@
 cask "dilated" do
-  version "1.0.0-beta.10"
-  sha256 "1b9b6eb73811c508667923aa790f84e32071984b273167e0c390c5bdb83c173f"
+  version "1.0.0-beta.11"
+  sha256 "ea4d3263639347a25886a1cfce20cf0d6d1559f8451644ff40713ea1db8f192c"
 
   url "https://github.com/CodesWhat/dilated/releases/download/v#{version}/Dilated-#{version}-macos-arm64.dmg"
   name "Dilated"
   desc "Keep your Mac awake, with reasons"
-  homepage "https://dilated.codeswhat.com/"
+  homepage "https://dilated.app/"
 
   livecheck do
     skip "Public beta; versions are tracked by scripts/check-cask-drift.sh."
