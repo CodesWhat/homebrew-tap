@@ -19,6 +19,10 @@
 # reads, so it is the single source of truth. Once an allowlisted project's
 # latest release is stable, this script errors until the entry is removed.
 #
+# "Latest" means greatest published_at among non-draft releases, fetched with
+# one paginated `gh api` call per cask. `gh release list` orders by created_at,
+# which misses a release created as a draft early and published later.
+#
 # Usage:
 #   bash scripts/check-cask-drift.sh
 #
@@ -30,7 +34,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-# Fail on the prerequisite rather than on four confusing empty release lookups.
+# Fail on the prerequisite rather than on confusing failed release lookups.
 if ! command -v gh >/dev/null 2>&1; then
   echo 'ERROR  the GitHub CLI (gh) is required: https://cli.github.com' >&2
   exit 2
@@ -78,6 +82,8 @@ pinned_version() {
 
 status=0
 checked=0
+gh_err="$(mktemp)"
+trap 'rm -f "$gh_err"' EXIT
 
 for cask in Casks/*.rb; do
   [ -e "$cask" ] || continue
@@ -105,23 +111,33 @@ for cask in Casks/*.rb; do
     allow_pre=1
   fi
 
+  # One paginated fetch per cask, newest by published_at. `gh release list`
+  # orders by created_at, so a release drafted early and published late would
+  # be missed. Timestamps are ISO-8601 UTC, so they sort lexically.
+  if ! releases="$(gh api --paginate "repos/$repo/releases?per_page=100" --jq \
+    '.[] | select(.draft == false and .published_at != null) | "\(.published_at) \(.tag_name) \(.prerelease)"' \
+    2>"$gh_err")"; then
+    printf 'ERROR  %-12s could not list releases for %s: %s\n' "$token" "$repo" "$(head -n 1 "$gh_err")"
+    status=1
+    continue
+  fi
   if [ "$allow_pre" -eq 1 ]; then
-    release="$(gh release list --repo "$repo" --exclude-drafts --limit 1 \
-      --json tagName,isPrerelease --jq '.[0] | select(. != null) | "\(.tagName) \(.isPrerelease)"' \
-      2>/dev/null || true)"
-    tag="${release% *}"
-    is_pre="${release##* }"
+    release="$(printf '%s\n' "$releases" | awk 'NF' | sort | tail -n 1)"
+    tag="$(printf '%s' "$release" | awk '{print $2}')"
+    is_pre="$(printf '%s' "$release" | awk '{print $3}')"
     tag_re='^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
     tag_desc='vX.Y.Z or vX.Y.Z-pre'
+    none_desc='published release'
   else
-    tag="$(gh release list --repo "$repo" --exclude-drafts --exclude-pre-releases \
-      --limit 1 --json tagName --jq '.[0].tagName // empty' 2>/dev/null || true)"
+    release="$(printf '%s\n' "$releases" | awk '$3 == "false"' | sort | tail -n 1)"
+    tag="$(printf '%s' "$release" | awk '{print $2}')"
     is_pre=""
     tag_re='^v?[0-9]+\.[0-9]+\.[0-9]+$'
     tag_desc='vX.Y.Z'
+    none_desc='published stable release'
   fi
   if [ -z "$tag" ]; then
-    printf 'ERROR  %-12s no published stable release found in %s\n' "$token" "$repo"
+    printf 'ERROR  %-12s no %s found in %s\n' "$token" "$none_desc" "$repo"
     status=1
     continue
   fi

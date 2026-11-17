@@ -59,6 +59,8 @@ jobs:
           persist-credentials: false
       - name: Test isolated audit trust and cleanup
         run: bash scripts/audit-casks.test.sh
+      - name: Test cask drift release selection
+        run: bash scripts/check-cask-drift.test.sh
       - name: Test Mouthtype release version selection
         run: python3 scripts/update-mouthtype.test.py
       - name: Audit the casks

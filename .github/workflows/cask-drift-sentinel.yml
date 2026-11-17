@@ -26,9 +26,9 @@ jobs:
   versions:
     name: cask versions match upstream releases
     runs-on: ubuntu-latest
-    # Four `gh release list` calls; observed runtime is under 30 seconds. The
-    # ceiling is a runaway guard, not a performance budget, so it sits well
-    # above that rather than near it.
+    # One paginated `gh api` releases call per cask; observed runtime is under
+    # 30 seconds. The ceiling is a runaway guard, not a performance budget, so
+    # it sits well above that rather than near it.
     timeout-minutes: 10
     permissions:
       contents: read
