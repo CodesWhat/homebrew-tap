@@ -41,9 +41,11 @@ concurrency:
 jobs:
   audit:
     name: audit every cask
-    # macOS because the tap ships macOS-only casks; `brew audit --cask` needs a
-    # macOS host to evaluate their depends_on stanzas honestly.
-    runs-on: macos-latest
+    # Linux Homebrew evaluates these macOS-only casks for macOS through
+    # `--os=macos --arch=all`. Verified identical to a macOS runner on
+    # 2026-11-17, including deliberately broken depends_on and sha256 stanzas.
+    # Ubuntu also avoids the org-wide macOS queue.
+    runs-on: ubuntu-latest
     # Offline audit, observed at under 90 seconds. See cask-drift-sentinel.yml
     # for why every job in this repo carries a ceiling.
     timeout-minutes: 20
@@ -57,6 +59,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@ceec4e8419bb3c97ce96e9dda7738499ed5f869d # 2026.11.14.1
       - name: Test isolated audit trust and cleanup
         run: bash scripts/audit-casks.test.sh
       - name: Test cask drift release selection
