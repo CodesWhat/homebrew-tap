@@ -86,8 +86,18 @@ jobs:
           # `version` is the first such number; a comment mentioning a version
           # above it would wedge this into a permanent, green no-op.
           current="$(sed -n 's/^[[:space:]]*version "\([^"]*\)".*/\1/p' Casks/mouthtype.rb | head -1 | cut -d, -f1 || true)"
-          if [ "$version" = "$current" ]; then
-            echo "Cask already at $version; nothing to do."
+          newer="$(python3 -c '
+          import re
+          import sys
+          release, current = sys.argv[1:]
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", current):
+              sys.exit("::error::Current cask version is missing or invalid")
+          released = tuple(map(int, release.split(".")))
+          pinned = tuple(map(int, current.split(".")))
+          print("true" if released > pinned else "false")
+          ' "$version" "$current")"
+          if [ "$newer" != "true" ]; then
+            echo "Release $version is not newer than cask $current; nothing to do."
             echo "version=" >> "$GITHUB_OUTPUT"
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0

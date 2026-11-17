@@ -17,12 +17,14 @@ on:
       - "Casks/**"
       - "scripts/**"
       - ".github/workflows/cask-ci.yml"
+      - ".github/workflows/update-mouthtype-cask.yml"
   push:
     branches: [main]
     paths:
       - "Casks/**"
       - "scripts/**"
       - ".github/workflows/cask-ci.yml"
+      - ".github/workflows/update-mouthtype-cask.yml"
   # A push made by update-mouthtype-cask.yml with the default GITHUB_TOKEN does
   # not start workflows, so `push` above cannot cover that cask. It audits
   # itself in-place before pushing instead. Using workflow_run to reach across
@@ -57,5 +59,7 @@ jobs:
           persist-credentials: false
       - name: Test isolated audit trust and cleanup
         run: bash scripts/audit-casks.test.sh
+      - name: Test Mouthtype release version selection
+        run: python3 scripts/update-mouthtype.test.py
       - name: Audit the casks
         run: bash scripts/audit-casks.sh
