@@ -77,6 +77,8 @@ jobs:
         run: python3 scripts/publish-mouthtype-cask.test.py
       - name: Test cask PR eligibility
         run: bash scripts/cask-pr-eligible.test.sh
+      - name: Test cask PR file list filter
+        run: bash scripts/cask-pr-files.test.sh
       - name: Test cask PR merge decision
         run: bash scripts/cask-pr-merge-decision.test.sh
       - name: Audit the casks

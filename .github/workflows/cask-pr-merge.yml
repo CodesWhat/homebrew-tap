@@ -70,8 +70,10 @@ jobs:
           draft="$(jq -r '.[0].isDraft' <<<"$prs")"
           base_sha="$(gh pr view "$pr" --json baseRefOid --jq .baseRefOid)"
 
-          files="$(gh api --paginate "repos/$GH_REPO/compare/$base_sha...$HEAD_SHA" \
-            --jq '.files[] | "\(.status) \(.filename)"')"
+          # One unpaginated call. cask-pr-files.jq rejects 300 or more files
+          # (the compare API's cap) and any filename that is not a plain cask.
+          files="$(gh api "repos/$GH_REPO/compare/$base_sha...$HEAD_SHA" \
+            | jq -r -f scripts/cask-pr-files.jq)"
           decision="$(printf '%s\n' "$files" | bash scripts/cask-pr-merge-decision.sh \
             "$HEAD_BRANCH" "$pr_sha" "$HEAD_SHA" "$base_ref" "$cross" "$draft")"
           if [ "$decision" != merge ]; then

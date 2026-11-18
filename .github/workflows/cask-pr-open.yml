@@ -47,10 +47,10 @@ jobs:
         run: |
           set -euo pipefail
           dir="$(mktemp -d)"
-          for name in cask-pr-eligible open-cask-pr; do
-            if ! gh api "repos/$GH_REPO/contents/scripts/$name.sh?ref=main" \
-              -H "Accept: application/vnd.github.raw" > "$dir/$name.sh"; then
-              echo "::warning::scripts/$name.sh is not on main yet; no PR opened for $BRANCH."
+          for name in cask-pr-eligible.sh cask-pr-files.jq open-cask-pr.sh; do
+            if ! gh api "repos/$GH_REPO/contents/scripts/$name?ref=main" \
+              -H "Accept: application/vnd.github.raw" > "$dir/$name"; then
+              echo "::warning::scripts/$name is not on main yet; no PR opened for $BRANCH."
               exit 0
             fi
           done
@@ -65,7 +65,7 @@ jobs:
           esac
           base_sha="$(gh api "repos/$GH_REPO/commits/main" --jq .sha)"
           files="$(gh api "repos/$GH_REPO/compare/$base_sha...$HEAD_SHA" \
-            --jq '.files[] | "\(.status) \(.filename)"')"
+            | jq -r -f "$dir/cask-pr-files.jq")"
           if ! reason="$(printf '%s\n' "$files" | bash "$dir/cask-pr-eligible.sh" --only "$product")"; then
             echo "::warning::No PR opened for $BRANCH. $reason"
             exit 0

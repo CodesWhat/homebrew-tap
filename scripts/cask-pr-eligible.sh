@@ -3,6 +3,10 @@
 # "<status> <filename>" line per changed file on stdin. Exits 0 if the PR is
 # eligible, 1 if not, and prints the reason either way.
 #
+# Input comes from scripts/cask-pr-files.jq, which validates every filename on
+# the JSON side and emits "reject <reason>" for anything unsafe, so a filename
+# cannot inject extra records. A "reject" line makes the PR ineligible here.
+#
 # With `--only <name>`, the only cask allowed is Casks/<name>.rb. Branches that
 # a publisher pushes (portwing-1.2.3) may touch only that product's cask.
 #
@@ -28,6 +32,10 @@ files=0
 
 while IFS= read -r line || [ -n "$line" ]; do
   [ -n "$line" ] || continue
+  if [ "${line%% *}" = reject ]; then
+    echo "Not eligible: ${line#reject }"
+    exit 1
+  fi
   status="${line%% *}"
   name="${line#* }"
   if [ "$status" = "$line" ]; then
