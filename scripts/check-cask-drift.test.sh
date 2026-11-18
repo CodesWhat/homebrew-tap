@@ -6,6 +6,7 @@ fixture="$(mktemp -d)"
 trap 'rm -rf "$fixture"' EXIT
 mkdir -p "$fixture/bin" "$fixture/repo/scripts" "$fixture/repo/audit_exceptions"
 cp "$script_dir/check-cask-drift.sh" "$fixture/repo/scripts/check-cask-drift.sh"
+cp "$script_dir/cask-version.sh" "$fixture/repo/scripts/cask-version.sh"
 
 # Stub gh: `auth status` succeeds; `api --paginate <path> --jq <expr>` runs the
 # real jq expression over each page file for the repo, one page per file.

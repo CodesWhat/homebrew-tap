@@ -254,9 +254,11 @@ Dilated ships as a public beta from GitHub prereleases until 1.0.0, listed in
 [`audit_exceptions/github_prerelease_allowlist.json`](audit_exceptions/github_prerelease_allowlist.json).
 When Dilated publishes a stable release, the drift check fails until that
 entry is removed. Homebrew's audit also fails if the cask pins a stable release
-while the entry remains. Each cask header identifies
-the generator that owns it. Do not edit a generated cask by hand. Fix the
-generator in the source project so the next release preserves the change.
+while the entry remains. Do not edit a generated cask by hand. For a
+generated cask, see the generator header when it has one, otherwise the owning
+CodesWhat/<cask> repository's release tooling, and fix it there so the next
+release preserves the change. The careerrat cask is frozen and maintained by
+hand here.
 
 Portwing and Sockguard release tooling only pushes the cask to a branch named
 `portwing-<version>` or `sockguard-<version>`. A workflow here,
@@ -298,6 +300,10 @@ set) to read each project's releases; the audit needs Homebrew:
 bash scripts/check-cask-drift.sh
 bash scripts/audit-casks.sh --online
 ```
+
+`--online` also takes `--skip-deprecated`, which leaves out casks whose
+`deprecate!` date has arrived; the daily sentinel uses it so a frozen cask
+can't fail the URL check.
 
 <hr>
 
