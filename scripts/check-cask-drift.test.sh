@@ -14,7 +14,7 @@ cat > "$fixture/bin/gh" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 case "${1:-}" in
-  auth) exit 0 ;;
+  auth) exit "${GH_AUTH_EXIT:-0}" ;;
   api)
     [ "${2:-}" = --paginate ]
     [ "${4:-}" = --jq ]
@@ -39,6 +39,18 @@ case "${1:-}" in
 esac
 SH
 chmod +x "$fixture/bin/gh"
+
+# Stub date: the deprecation check asks for today in UTC; pin it to a fixed day
+# and pass every other invocation through to the real date.
+cat > "$fixture/bin/date" <<'SH'
+#!/usr/bin/env bash
+if [ "$*" = '-u +%Y-%m-%d' ]; then
+  printf '%s\n' "${DATE_FIXTURE_TODAY:-2026-06-15}"
+else
+  exec /bin/date "$@"
+fi
+SH
+chmod +x "$fixture/bin/date"
 export PATH="$fixture/bin:$PATH"
 export GH_FIXTURE_ROOT="$fixture"
 
@@ -57,10 +69,14 @@ new_case() {
   fi
 }
 
+# deprecate <token> <date>: add a deprecate! stanza to the cask.
+deprecate() { printf '  deprecate! date: "%s", because: :unmaintained\n' "$2" >> "$repo/Casks/$1.rb"; }
+
 # page <token> <n> <json array>
 page() { printf '%s\n' "$3" > "$fixture/pages/$1/page-$2.json"; }
 
 # run_case <name> <expected exit> <expected output substring>...
+# A substring prefixed with ! must be absent from the output.
 run_case() {
   local name="$1" want="$2" out rc=0
   shift 2
@@ -68,7 +84,10 @@ run_case() {
   local ok=1
   [ "$rc" -eq "$want" ] || ok=0
   for needle in "$@"; do
-    printf '%s\n' "$out" | grep -Fq -- "$needle" || ok=0
+    case "$needle" in
+      '!'*) ! printf '%s\n' "$out" | grep -Fq -- "${needle#!}" || ok=0 ;;
+      *) printf '%s\n' "$out" | grep -Fq -- "$needle" || ok=0 ;;
+    esac
   done
   if [ "$ok" -eq 1 ]; then
     printf 'PASS  %s\n' "$name"
@@ -135,6 +154,57 @@ run_case 'empty stable list' 1 'no published stable release found'
 new_case alpha 1.0.0 allowlisted
 page alpha 1 '[{"tag_name":"v1.0.0","draft":true,"prerelease":false,"published_at":null}]'
 run_case 'empty allowlisted list' 1 'no published release found'
+
+# 9. Deprecation skip: skipped from the deprecate! date onward, even when the
+# release lookup would fail. A future date is still compared.
+new_case alpha 1.0.0
+deprecate alpha 2026-06-14
+touch "$fixture/pages/alpha/FAIL"
+run_case 'deprecated yesterday is skipped' 0 'skip   alpha'
+new_case alpha 1.0.0
+deprecate alpha 2026-06-15
+touch "$fixture/pages/alpha/FAIL"
+run_case 'deprecated today is skipped' 0 'skip   alpha'
+new_case alpha 1.0.0
+deprecate alpha 2026-06-16
+page alpha 1 '[{"tag_name":"v1.1.0","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z"}]'
+run_case 'deprecated tomorrow is still compared' 1 'DRIFT  alpha        cask pins 1.0.0, CodesWhat/alpha latest is 1.1.0' '!skip'
+
+# 10. A version.csv pin is compared by its version part only.
+new_case alpha 0.3.0,66
+page alpha 1 '[{"tag_name":"v0.3.0","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z"}]'
+run_case 'csv pin compares the version part' 0 'ok     alpha        0.3.0'
+
+# 11. A tag that is not vX.Y.Z is named as a tagging change.
+new_case alpha 1.2.3
+page alpha 1 '[{"tag_name":"release-1.2.3","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z"}]'
+run_case 'non-semver latest tag is reported' 1 'latest tag release-1.2.3 is not vX.Y.Z'
+
+# 12. A cask with no version stanza.
+new_case alpha 1.0.0
+printf 'cask "alpha" do\nend\n' > "$repo/Casks/alpha.rb"
+page alpha 1 '[{"tag_name":"v1.0.0","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z"}]'
+run_case 'missing version stanza is reported' 1 'no version stanza found'
+
+# 13. gh not authenticated.
+new_case alpha 1.0.0
+page alpha 1 '[{"tag_name":"v1.0.0","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z"}]'
+GH_AUTH_EXIT=1 run_case 'unauthenticated gh exits 2' 2 'gh is not authenticated'
+
+# 14. Malformed allowlist JSON.
+new_case alpha 1.0.0
+page alpha 1 '[{"tag_name":"v1.0.0","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z"}]'
+printf 'not json\n' > "$repo/audit_exceptions/github_prerelease_allowlist.json"
+run_case 'malformed allowlist exits 2' 2 'could not parse'
+
+# 15. Allowlist matching is exact: alpha-cli being listed must not allow alpha.
+new_case alpha 1.0.0
+printf '{"alpha-cli": "all"}\n' > "$repo/audit_exceptions/github_prerelease_allowlist.json"
+page alpha 1 '[
+  {"tag_name":"v1.0.0","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z"},
+  {"tag_name":"v2.0.0-rc.1","draft":false,"prerelease":true,"published_at":"2026-02-01T00:00:00Z"}
+]'
+run_case 'allowlist entry is not a substring match' 0 'ok     alpha        1.0.0' '!pre-release allowed'
 
 if [ "$failures" -ne 0 ]; then
   printf '%s case(s) failed.\n' "$failures" >&2
