@@ -1,0 +1,101 @@
+name: cask-pr-auto-merge
+
+# Tap main requires a pull request and a passing `audit every cask` check
+# (cask-ci.yml), with no review. This workflow gets cask changes through that
+# gate without a human clicking merge. It handles two cases.
+#
+# pull_request: a PR opened by other tooling (dilated, idlescreen). If it only
+# adds or modifies files directly under Casks/, auto-merge is turned on.
+#
+# push: GoReleaser in portwing and sockguard only pushes the cask to a branch
+# named portwing-<version> or sockguard-<version> (GoReleaser creates the branch
+# from main if it is missing), because its credential may lack pull-requests
+# write. This workflow opens the PR itself, but only when the branch changes
+# nothing except that product's own cask. Anything else gets a warning and no
+# PR, so a person looks at the branch.
+#
+# Auto-merge only completes after the required check passes, so this workflow
+# never bypasses the gate. Fork pull requests are excluded, and so is anything
+# touching a file outside Casks/<name>.rb or removing or renaming a cask.
+# Pull requests opened with GITHUB_TOKEN do not start workflows, so the push
+# path dispatches cask-ci on the branch, and update-mouthtype-cask.yml does the
+# same for its own PR. The decision logic is in scripts/cask-pr-eligible.sh and
+# the PR sequence in scripts/open-cask-pr.sh, so both can be tested. Both are
+# read from main through the API, so nothing from the branch runs here.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: ["portwing-*", "sockguard-*"]
+
+permissions: {}
+
+jobs:
+  auto-merge:
+    name: enable auto-merge for cask-only changes
+    if: >-
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft) ||
+      (github.event_name == 'push' && !github.event.deleted)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Harden the runner (audit all outbound calls)
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - name: Enable auto-merge for cask-only changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH: ${{ github.ref_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
+        run: |
+          set -euo pipefail
+          dir="$(mktemp -d)"
+          for name in cask-pr-eligible open-cask-pr; do
+            if ! gh api "repos/$GH_REPO/contents/scripts/$name.sh?ref=$BASE_REF" \
+              -H "Accept: application/vnd.github.raw" > "$dir/$name.sh"; then
+              echo "::warning::scripts/$name.sh is not on $BASE_REF yet; leaving this change for manual merge."
+              exit 0
+            fi
+          done
+
+          if [ "$EVENT" = pull_request ]; then
+            files="$(gh api --paginate "repos/$GH_REPO/pulls/$NUMBER/files" \
+              --jq '.[] | "\(.status) \(.filename)"')"
+            if ! printf '%s\n' "$files" | bash "$dir/cask-pr-eligible.sh"; then
+              echo "Leaving PR #$NUMBER for manual merge."
+              exit 0
+            fi
+            gh pr merge "$NUMBER" --auto --squash
+            exit 0
+          fi
+
+          # push: the branch prefix names the one cask it may change.
+          product="${BRANCH%%-*}"
+          case "$product" in
+            portwing | sockguard) ;;
+            *)
+              echo "::warning::Branch $BRANCH is not a portwing or sockguard release branch."
+              exit 0
+              ;;
+          esac
+          files="$(gh api "repos/$GH_REPO/compare/main...$BRANCH" \
+            --jq '.files[] | "\(.status) \(.filename)"')"
+          if ! reason="$(printf '%s\n' "$files" | bash "$dir/cask-pr-eligible.sh" --only "$product")"; then
+            echo "::warning::No PR opened for $BRANCH. $reason"
+            exit 0
+          fi
+          title="$(gh api "repos/$GH_REPO/commits/$BRANCH" \
+            --jq '.commit.message | split("\n")[0]')"
+          bash "$dir/open-cask-pr.sh" "$BRANCH" "$title" \
+            "Updates the $product cask. Pushed by the $product release as $BRANCH and checked by cask-pr-auto-merge.yml."

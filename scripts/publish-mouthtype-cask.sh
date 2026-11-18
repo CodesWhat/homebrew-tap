@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Validates the generated Mouthtype cask and commits it to main. Run from the
-# repo root. Env: VERSION, GITHUB_TOKEN, and optionally CASK_ARTIFACT (default
-# $RUNNER_TEMP/cask/mouthtype.rb).
+# Validates the generated Mouthtype cask and opens a pull request for it. Run
+# from the repo root. Env: VERSION, GITHUB_TOKEN, GH_TOKEN (for gh), and
+# optionally CASK_ARTIFACT (default $RUNNER_TEMP/cask/mouthtype.rb).
 #
 # This never runs upstream code and never evaluates the cask. The generated
 # file must equal the current Casks/mouthtype.rb except for the values on its
 # one version line and one sha256 line, so any other change to the cask has to
 # land through a reviewed PR. The push credential exists only for the push
-# command and is never written to .git/config.
+# command and is never written to .git/config. Nothing here pushes to main: the
+# cask goes onto mouthtype/vX.Y.Z, a PR is opened (or reused), cask-ci is
+# dispatched on the branch, and auto-merge is requested.
 set -euo pipefail
 
 src="${CASK_ARTIFACT:-${RUNNER_TEMP:-}/cask/mouthtype.rb}"
@@ -60,9 +62,26 @@ if git diff --quiet -- Casks/mouthtype.rb; then
   echo "Cask already matches; nothing to commit."
   exit 0
 fi
+branch="mouthtype/v$VERSION"
 git config user.name "github-actions[bot]"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+git checkout -q -B "$branch"
 git add Casks/mouthtype.rb
 git commit -m "build(cask): update mouthtype to $VERSION"
+
 auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
-git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin HEAD:main
+push() {
+  git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+    push "$@" origin "refs/heads/$branch:refs/heads/$branch"
+}
+# Only this mouthtype/ branch is ever force-pushed, and only if the remote
+# copy is what we last saw, to replace a stale branch from an earlier run.
+if ! push 2>/dev/null; then
+  git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+    fetch -q origin "refs/heads/$branch:refs/remotes/origin/$branch"
+  push --force-with-lease="refs/heads/$branch:refs/remotes/origin/$branch"
+fi
+
+bash "$(dirname "$0")/open-cask-pr.sh" "$branch" \
+  "build(cask): update mouthtype to $VERSION" \
+  "Updates the mouthtype cask to release $VERSION. Generated and validated by update-mouthtype-cask.yml."
