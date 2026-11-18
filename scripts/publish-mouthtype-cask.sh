@@ -9,7 +9,7 @@
 # land through a reviewed PR. The push credential exists only for the push
 # command and is never written to .git/config. Nothing here pushes to main: the
 # cask goes onto mouthtype/vX.Y.Z, a PR is opened (or reused), cask-ci is
-# dispatched on the branch, and auto-merge is requested.
+# dispatched on the branch, and cask-pr-merge.yml merges it once that passes.
 set -euo pipefail
 
 src="${CASK_ARTIFACT:-${RUNNER_TEMP:-}/cask/mouthtype.rb}"

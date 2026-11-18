@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Decides whether a pull request may be auto-merged. Reads one
+# Decides whether a pull request may be merged without review. Reads one
 # "<status> <filename>" line per changed file on stdin. Exits 0 if the PR is
 # eligible, 1 if not, and prints the reason either way.
 #

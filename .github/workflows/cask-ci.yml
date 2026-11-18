@@ -4,12 +4,12 @@ name: cask-ci
 # goes through a pull request, and the `audit every cask` job below is the
 # required check on it. The publishers reach main two ways. GoReleaser in
 # portwing and sockguard pushes the cask to a portwing-<version> or
-# sockguard-<version> branch, and cask-pr-auto-merge.yml opens the PR. The
+# sockguard-<version> branch, and cask-pr-open.yml opens the PR. The
 # mouthtype workflow that lives here opens its own PR, and dilated and
-# idlescreen open PRs from their release jobs. Cask-only PRs get auto-merge, so
-# a cask lands once this audit passes. A malformed cask breaks `brew install`
-# for everyone who has tapped this repo, so it is worth catching in seconds
-# rather than in a bug report.
+# idlescreen open PRs from their release jobs. cask-pr-merge.yml merges a
+# cask-only PR after this audit passes, so no auto-merge setting is needed. A
+# malformed cask breaks `brew install` for everyone who has tapped this repo,
+# so it is worth catching in seconds rather than in a bug report.
 #
 # Offline audit only. See scripts/audit-casks.sh for why `brew style` is not a
 # gate here, and cask-drift-sentinel.yml for the online URL checks.
@@ -26,7 +26,7 @@ on:
       - ".github/workflows/cask-ci.yml"
       - ".github/workflows/update-mouthtype-cask.yml"
   # A pull request opened with GITHUB_TOKEN does not start workflows, so
-  # update-mouthtype-cask.yml and cask-pr-auto-merge.yml dispatch this workflow
+  # update-mouthtype-cask.yml and cask-pr-open.yml dispatch this workflow
   # on the branch. The check
   # run lands on the branch head commit, which satisfies the required check.
   workflow_dispatch: {}
@@ -75,7 +75,9 @@ jobs:
         run: python3 scripts/update-mouthtype.test.py
       - name: Test Mouthtype cask publish validation
         run: python3 scripts/publish-mouthtype-cask.test.py
-      - name: Test cask PR auto-merge eligibility
+      - name: Test cask PR eligibility
         run: bash scripts/cask-pr-eligible.test.sh
+      - name: Test cask PR merge decision
+        run: bash scripts/cask-pr-merge-decision.test.sh
       - name: Audit the casks
         run: bash scripts/audit-casks.sh

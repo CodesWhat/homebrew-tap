@@ -3,7 +3,7 @@ name: update-mouthtype-cask
 # Watches CodesWhat/mouthtype for a new published release and updates
 # Casks/mouthtype.rb to match by opening a pull request from a
 # mouthtype/vX.Y.Z branch. Main requires a PR and a passing `audit every cask`
-# check, and auto-merge lands the PR once that check passes. The cask
+# check, and cask-pr-merge.yml merges the PR once that check passes. The cask
 # body comes from mouthtype's own scripts/generate-homebrew-cask.sh, which
 # downloads the published release DMG and hashes it, so the sha256 provably
 # matches what users download.
@@ -99,7 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # contents: write pushes the mouthtype/ branch, pull-requests: write opens
-    # the PR and enables auto-merge, actions: write dispatches cask-ci on the
+    # the PR, actions: write dispatches cask-ci on the
     # branch (a PR opened with GITHUB_TOKEN does not start workflows itself).
     permissions:
       contents: write

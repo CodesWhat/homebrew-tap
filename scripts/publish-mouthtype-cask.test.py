@@ -37,13 +37,12 @@ exec "$REAL_GIT" "$@"
 """
 
 # Stub gh: records argv. `pr list` prints GH_PR_LIST (an existing PR number, or
-# nothing), `pr create` prints a PR URL, `pr merge` answers GH_MERGE_EXIT.
+# nothing), `pr create` prints a PR URL.
 GH_STUB = """#!/usr/bin/env bash
 echo "$*" >> "$GH_LOG"
 case "$1 $2" in
   "pr list") [ -n "${GH_PR_LIST:-}" ] && echo "$GH_PR_LIST"; exit 0 ;;
   "pr create") echo "https://github.com/CodesWhat/homebrew-tap/pull/7"; exit 0 ;;
-  "pr merge") exit "${GH_MERGE_EXIT:-0}" ;;
 esac
 exit 0
 """
@@ -59,7 +58,7 @@ def make_artifact(text=None, version="0.12.3", sha=NEW_SHA):
 
 class PublishTests(unittest.TestCase):
     def publish(self, artifact, version="0.12.3", push_exit=0, missing=False,
-                push_first_exit="", pr_list="", merge_exit=0):
+                push_first_exit="", pr_list=""):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "scripts").mkdir()
@@ -94,7 +93,7 @@ class PublishTests(unittest.TestCase):
                 REAL_GIT=real_git, PUSH_LOG=str(push_log),
                 PUSH_EXIT=str(push_exit), PUSH_FIRST_EXIT=str(push_first_exit),
                 GH_LOG=str(gh_log), GH_PR_LIST=pr_list,
-                GH_MERGE_EXIT=str(merge_exit), VERSION=version,
+                VERSION=version,
                 GITHUB_TOKEN=CREDENTIAL, CASK_ARTIFACT=str(src),
                 RUNNER_TEMP=str(root / "nonexistent"))
             result = subprocess.run(
@@ -146,7 +145,7 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(out["branch"], branch)
         self.assertEqual(self.calls(out, "pr create"), 1)
         self.assertEqual(self.calls(out, f"workflow run cask-ci.yml --ref {branch}"), 1)
-        self.assertEqual(self.calls(out, "pr merge 7 --auto --squash"), 1)
+        self.assertEqual(self.calls(out, "pr merge"), 0)
         create = next(g for g in out["gh"] if g.startswith("pr create"))
         self.assertIn("--title build(cask): update mouthtype to 0.12.3", create)
         self.assertIn("--base main", create)
@@ -159,7 +158,7 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(out["result"].returncode, 0, out["result"].stderr)
         self.assertEqual(self.calls(out, "pr create"), 0)
         self.assertEqual(self.calls(out, "workflow run cask-ci.yml --ref mouthtype/v0.12.3"), 1)
-        self.assertEqual(self.calls(out, "pr merge 12 --auto --squash"), 1)
+        self.assertEqual(self.calls(out, "pr merge"), 0)
 
     def test_rejected_push_retries_with_lease_on_the_mouthtype_branch(self):
         out = self.publish(make_artifact(), push_first_exit=1)
@@ -171,12 +170,6 @@ class PublishTests(unittest.TestCase):
         self.assertIn("refs/heads/mouthtype/v0.12.3:refs/heads/mouthtype/v0.12.3", lease)
         for push in out["pushes"]:
             self.assertNotIn("main", push)
-
-    def test_auto_merge_failure_warns_and_keeps_the_pr(self):
-        out = self.publish(make_artifact(), merge_exit=1)
-        self.assertEqual(out["result"].returncode, 0, out["result"].stderr)
-        self.assertIn("::warning::", out["result"].stdout)
-        self.assertEqual(self.calls(out, "pr create"), 1)
 
     def test_identical_artifact_is_a_noop(self):
         current = re.search(r'(?m)^  version "([^"]*)"$', REAL_CASK.read_text()).group(1)
