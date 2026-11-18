@@ -59,8 +59,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Ubuntu runners ship Homebrew off PATH. Update it in place rather than
+      # use Homebrew/actions, which the org's allowed-actions policy rejects;
+      # an outdated brew lacks the `brew trust` the audit script runs.
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@ceec4e8419bb3c97ce96e9dda7738499ed5f869d # 2026.11.14.1
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew update --quiet
+          brew --version
+          dirname "$(command -v brew)" >> "$GITHUB_PATH"
       - name: Test isolated audit trust and cleanup
         run: bash scripts/audit-casks.test.sh
       - name: Test cask drift release selection
