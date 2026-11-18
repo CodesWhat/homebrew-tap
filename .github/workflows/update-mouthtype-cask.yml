@@ -114,39 +114,13 @@ jobs:
         with:
           name: mouthtype-cask
           path: ${{ runner.temp }}/cask
-      # This job never runs upstream code and never evaluates the cask; it only
-      # checks the file's shape and version, then commits it. The push
+      # This job never runs upstream code and never evaluates the cask. The
+      # script requires the generated file to equal the current cask except
+      # for its version and sha256 values, then commits it. The push
       # credential exists only for the push command and is never written to
       # .git/config.
       - name: Verify and commit the generated cask
         env:
           VERSION: ${{ needs.generate.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          src="$RUNNER_TEMP/cask/mouthtype.rb"
-          if [ ! -f "$src" ]; then
-            echo "::error::Generated cask artifact is missing"
-            exit 1
-          fi
-          first="$(grep -Ev '^[[:space:]]*(#|$)' "$src" | head -1 || true)"
-          if [ "$first" != 'cask "mouthtype" do' ]; then
-            echo "::error::Generated cask does not start with 'cask \"mouthtype\" do'"
-            exit 1
-          fi
-          generated="$(sed -n 's/^[[:space:]]*version "\([^"]*\)".*/\1/p' "$src" | head -1 | cut -d, -f1)"
-          if [ "$generated" != "$VERSION" ]; then
-            echo "::error::Generated cask version '$generated' does not match release '$VERSION'"
-            exit 1
-          fi
-          cp "$src" Casks/mouthtype.rb
-          if git diff --quiet -- Casks/mouthtype.rb; then
-            echo "Cask already matches; nothing to commit."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Casks/mouthtype.rb
-          git commit -m "build(cask): update mouthtype to $VERSION"
-          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin HEAD:main
+        run: bash scripts/publish-mouthtype-cask.sh

