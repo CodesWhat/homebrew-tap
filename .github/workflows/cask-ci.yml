@@ -74,5 +74,7 @@ jobs:
         run: bash scripts/check-cask-drift.test.sh
       - name: Test Mouthtype release version selection
         run: python3 scripts/update-mouthtype.test.py
+      - name: Test Mouthtype cask publish validation
+        run: python3 scripts/publish-mouthtype-cask.test.py
       - name: Audit the casks
         run: bash scripts/audit-casks.sh
