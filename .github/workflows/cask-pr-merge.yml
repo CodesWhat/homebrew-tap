@@ -68,11 +68,15 @@ jobs:
           base_ref="$(jq -r '.[0].baseRefName' <<<"$prs")"
           cross="$(jq -r '.[0].isCrossRepository' <<<"$prs")"
           draft="$(jq -r '.[0].isDraft' <<<"$prs")"
-          base_sha="$(gh pr view "$pr" --json baseRefOid --jq .baseRefOid)"
+          # Compare against main's current tip, not the PR's base. The base can
+          # be retargeted between reads, but the diff that matters is always
+          # the one against main, and a PR retargeted at merge time merges into
+          # that other branch, never into main.
+          main_sha="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)"
 
           # One unpaginated call. cask-pr-files.jq rejects 300 or more files
           # (the compare API's cap) and any filename that is not a plain cask.
-          files="$(gh api "repos/$GH_REPO/compare/$base_sha...$HEAD_SHA" \
+          files="$(gh api "repos/$GH_REPO/compare/$main_sha...$HEAD_SHA" \
             | jq -r -f scripts/cask-pr-files.jq)"
           decision="$(printf '%s\n' "$files" | bash scripts/cask-pr-merge-decision.sh \
             "$HEAD_BRANCH" "$pr_sha" "$HEAD_SHA" "$base_ref" "$cross" "$draft")"
