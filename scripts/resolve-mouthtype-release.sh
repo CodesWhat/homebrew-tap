@@ -4,6 +4,9 @@
 # to do) to $GITHUB_OUTPUT. Needs GH_TOKEN for gh.
 set -euo pipefail
 
+# shellcheck source=cask-version.sh disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/cask-version.sh"
+
 # Pick by published_at, not by listing order: `gh release list` orders by
 # created_at, so a release created as a draft early and published later would
 # be skipped forever. check-cask-drift.sh selects the same way. ISO-8601 UTC
@@ -31,7 +34,7 @@ fi
 # number anywhere in the file happens to work today only because
 # `version` is the first such number; a comment mentioning a version
 # above it would wedge this into a permanent, green no-op.
-current="$(sed -n 's/^[[:space:]]*version "\([^"]*\)".*/\1/p' Casks/mouthtype.rb | head -1 | cut -d, -f1 || true)"
+current="$(pinned_version Casks/mouthtype.rb || true)"
 newer="$(python3 -c '
 import re
 import sys

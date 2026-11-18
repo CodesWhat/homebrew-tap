@@ -6,6 +6,7 @@
 # Usage:
 #   bash scripts/audit-casks.sh                  # offline, every cask
 #   bash scripts/audit-casks.sh --online         # also verify URLs resolve
+#   bash scripts/audit-casks.sh --online --skip-deprecated # leave out casks past their deprecate! date
 #   bash scripts/audit-casks.sh --min-os careerrat # released app's minimum macOS
 #   bash scripts/audit-casks.sh careerrat        # just one cask
 #
@@ -28,10 +29,15 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 online=0
 min_os=0
-case "${1:-}" in
-  --online) online=1; shift ;;
-  --min-os) online=1; min_os=1; shift ;;
-esac
+skip_deprecated=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --online) online=1; shift ;;
+    --min-os) online=1; min_os=1; shift ;;
+    --skip-deprecated) skip_deprecated=1; shift ;;
+    *) break ;;
+  esac
+done
 
 # With no arguments, audit the whole tap. Named tokens audit just those, so a
 # release automation can gate on the one cask it is about to publish without
@@ -49,6 +55,26 @@ for token in "${tokens[@]}"; do
     exit 2
   fi
 done
+
+# Opt-in: leave out casks whose deprecate! date has arrived, using the same
+# parse and comparison as check-cask-drift.sh. ISO dates compare as strings.
+if [ "$skip_deprecated" -eq 1 ]; then
+  today="$(date -u +%Y-%m-%d)"
+  kept=()
+  for token in "${tokens[@]}"; do
+    deprecated_on="$(sed -n 's/^[[:space:]]*deprecate![[:space:]]*date:[[:space:]]*"\([0-9-]*\)".*/\1/p' "Casks/$token.rb" | head -1)"
+    if [ -n "$deprecated_on" ] && [ ! "$deprecated_on" \> "$today" ]; then
+      printf 'skip   %s (deprecated %s)\n' "$token" "$deprecated_on"
+    else
+      kept+=("$token")
+    fi
+  done
+  if [ "${#kept[@]}" -eq 0 ]; then
+    echo 'Every selected cask is deprecated; nothing to audit.'
+    exit 0
+  fi
+  tokens=("${kept[@]}")
+fi
 
 # Point Homebrew at this checkout under a tap name of its own, never
 # codeswhat/tap. If the real tap is already installed -- which it is on any

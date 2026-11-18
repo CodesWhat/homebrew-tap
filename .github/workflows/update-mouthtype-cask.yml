@@ -30,21 +30,46 @@ on:
 permissions: {}
 
 jobs:
-  generate:
-    name: generate the mouthtype cask
-    # macOS so the generated cask can be audited here, before it is pushed,
-    # rather than after users can already install it. The generator needs only bash, curl, shasum, awk and grep, all of which are
-    # native here (it calls PlistBuddy solely to read packaging/Version.plist when
-    # --version is omitted, and this workflow always passes it).
-    runs-on: macos-latest
-    # Observed at under a minute, including the release download the generator
-    # hashes. Leaving it able to sit wedged for six hours is the worst of the
-    # four.
-    timeout-minutes: 20
+  # Most scheduled runs find nothing to do. Deciding that needs only gh, sed
+  # and python3, so it runs on Linux rather than waiting for a macOS runner
+  # (one run queued 69 minutes for 26 seconds of work).
+  resolve:
+    name: resolve the latest mouthtype release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
     outputs:
       version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Harden the runner (audit all outbound calls)
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Resolve the latest published mouthtype release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/resolve-mouthtype-release.sh
+
+  generate:
+    name: generate the mouthtype cask
+    needs: resolve
+    if: needs.resolve.outputs.version != ''
+    # macOS because the generator is macOS-oriented (it uses PlistBuddy when
+    # --version is omitted) and `brew audit` of the generated cask has to run
+    # here, before it is pushed, rather than after users can already install it.
+    runs-on: macos-latest
+    # Observed at under a minute, including the release download the generator
+    # hashes. Without a limit a wedged run would sit for the six-hour default.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ needs.resolve.outputs.version }}
       changed: ${{ steps.cask.outputs.changed }}
     steps:
       - name: Harden the runner (audit all outbound calls)
@@ -61,16 +86,10 @@ jobs:
           repository: CodesWhat/mouthtype
           path: mouthtype-src
           persist-credentials: false
-      - name: Resolve the latest published mouthtype release
-        id: release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/resolve-mouthtype-release.sh
       - name: Regenerate and audit the cask
         id: cask
-        if: steps.release.outputs.version != ''
         env:
-          VERSION: ${{ steps.release.outputs.version }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
           set -euo pipefail
           mouthtype-src/scripts/generate-homebrew-cask.sh --version "$VERSION" --write Casks/mouthtype.rb

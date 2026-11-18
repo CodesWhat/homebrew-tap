@@ -127,4 +127,48 @@ expect_calls 'audit --cask --os=macos --arch=all codeswhat-ci/tap/careerrat
 audit --cask --os=macos --arch=all codeswhat-ci/tap/dilated'
 [ ! -e "$fixture/brew/Library/Taps/codeswhat-ci/homebrew-tap" ]
 
+# --skip-deprecated: a past-dated deprecated cask is skipped only with the flag,
+# a future-dated one is still audited, in either flag order.
+printf 'cask "oldie" do\n  deprecate! date: "2020-01-01", because: :unmaintained\nend\n' > "$fixture/repo/Casks/oldie.rb"
+printf 'cask "future" do\n  deprecate! date: "2999-01-01", because: :unmaintained\nend\n' > "$fixture/repo/Casks/future.rb"
+
+rm -f "$fixture/audit-calls"
+out="$(bash "$fixture/repo/scripts/audit-casks.sh" --online --skip-deprecated)"
+grep -qx 'skip   oldie (deprecated 2020-01-01)' <<<"$out"
+expect_calls 'audit --cask --os=macos --arch=all --online codeswhat-ci/tap/careerrat
+audit --cask --os=macos --arch=all --online codeswhat-ci/tap/dilated
+audit --cask --os=macos --arch=all --online codeswhat-ci/tap/future'
+
+rm -f "$fixture/audit-calls"
+bash "$fixture/repo/scripts/audit-casks.sh" --skip-deprecated --online >/dev/null
+expect_calls 'audit --cask --os=macos --arch=all --online codeswhat-ci/tap/careerrat
+audit --cask --os=macos --arch=all --online codeswhat-ci/tap/dilated
+audit --cask --os=macos --arch=all --online codeswhat-ci/tap/future'
+
+rm -f "$fixture/audit-calls"
+bash "$fixture/repo/scripts/audit-casks.sh" >/dev/null
+grep -q 'codeswhat-ci/tap/oldie' "$fixture/audit-calls"
+
+# Everything skipped: exit 0 before any brew call.
+rm -f "$fixture/audit-calls"
+cp "$fixture/bin/brew" "$fixture/brew.real"
+printf '#!/usr/bin/env bash\necho "brew called: $*" >&2\nexit 99\n' > "$fixture/bin/brew"
+out="$(bash "$fixture/repo/scripts/audit-casks.sh" --online --skip-deprecated oldie 2>&1)"
+grep -qx 'skip   oldie (deprecated 2020-01-01)' <<<"$out"
+if grep -q 'brew called' <<<"$out"; then
+  echo 'Expected no brew call when every cask is skipped' >&2
+  exit 1
+fi
+cp "$fixture/brew.real" "$fixture/bin/brew"
+chmod +x "$fixture/bin/brew"
+[ ! -e "$fixture/audit-calls" ]
+
+# An audit failure still propagates alongside the flag.
+rc=0
+AUDIT_FIXTURE_FAIL_CASK=codeswhat-ci/tap/future bash "$fixture/repo/scripts/audit-casks.sh" --online --skip-deprecated >/dev/null || rc=$?
+if [ "$rc" -ne 1 ]; then
+  printf 'Expected failing cask with --skip-deprecated to exit 1, got %s\n' "$rc" >&2
+  exit 1
+fi
+
 printf 'Isolated trust, audit failure and cleanup checks passed.\n'

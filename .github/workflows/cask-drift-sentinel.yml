@@ -4,8 +4,8 @@ name: cask-drift-sentinel
 # release it is supposed to be serving?
 #
 # Only the mouthtype cask has a pusher in this repository (careerrat is frozen
-# and deprecated). portwing, sockguard
-# and idlescreen are committed here by their own projects' release tooling, so
+# and deprecated). portwing, sockguard,
+# idlescreen and dilated are committed here by their own projects' release tooling, so
 # if one of those pushes stops happening there is nothing on this side that
 # notices -- the tap just keeps serving an old version, indefinitely and
 # silently. This job is the thing that notices. It is deliberately blind to how
@@ -85,4 +85,4 @@ jobs:
         # version job above sets so `gh` can authenticate, does nothing here.
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/audit-casks.sh --online
+        run: bash scripts/audit-casks.sh --online --skip-deprecated

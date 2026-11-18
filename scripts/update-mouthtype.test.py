@@ -9,6 +9,7 @@ import unittest
 
 
 SCRIPT = Path(__file__).resolve().parent / "resolve-mouthtype-release.sh"
+HELPER = SCRIPT.parent / "cask-version.sh"
 EXPR_PATH = "repos/CodesWhat/mouthtype/releases?per_page=100"
 
 # Stub gh: validates argv, then runs the real jq expression over each page file,
@@ -42,6 +43,7 @@ class ReleaseSelectionTests(unittest.TestCase):
             root = Path(directory)
             (root / "scripts").mkdir()
             shutil.copy(SCRIPT, root / "scripts/resolve-mouthtype-release.sh")
+            shutil.copy(HELPER, root / "scripts/cask-version.sh")
             (root / "Casks").mkdir()
             (root / "Casks/mouthtype.rb").write_text(
                 cask if cask is not None
