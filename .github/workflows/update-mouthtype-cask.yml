@@ -67,42 +67,7 @@ jobs:
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          tag="$(gh release list --repo CodesWhat/mouthtype --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')"
-          if [ -z "$tag" ]; then
-            echo "No published release found; nothing to do."
-            echo "version=" >> "$GITHUB_OUTPUT"
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          version="${tag#v}"
-          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Latest release tag '$tag' does not match vX.Y.Z"
-            exit 1
-          fi
-          # Read the version stanza specifically. Matching the first three-part
-          # number anywhere in the file happens to work today only because
-          # `version` is the first such number; a comment mentioning a version
-          # above it would wedge this into a permanent, green no-op.
-          current="$(sed -n 's/^[[:space:]]*version "\([^"]*\)".*/\1/p' Casks/mouthtype.rb | head -1 | cut -d, -f1 || true)"
-          newer="$(python3 -c '
-          import re
-          import sys
-          release, current = sys.argv[1:]
-          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", current):
-              sys.exit("::error::Current cask version is missing or invalid")
-          released = tuple(map(int, release.split(".")))
-          pinned = tuple(map(int, current.split(".")))
-          print("true" if released > pinned else "false")
-          ' "$version" "$current")"
-          if [ "$newer" != "true" ]; then
-            echo "Release $version is not newer than cask $current; nothing to do."
-            echo "version=" >> "$GITHUB_OUTPUT"
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+        run: bash scripts/resolve-mouthtype-release.sh
       - name: Regenerate and audit the cask
         id: cask
         if: steps.release.outputs.version != ''
