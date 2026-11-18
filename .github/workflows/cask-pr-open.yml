@@ -1,0 +1,76 @@
+name: cask-pr-open
+
+# Opens the pull request for a cask branch that GoReleaser pushed. Portwing and
+# sockguard release tooling only pushes portwing-<version> or
+# sockguard-<version> (GoReleaser creates the branch from main if it is
+# missing), because its credential may lack pull-requests write.
+#
+# A push event runs the workflow file as it exists on the pushed branch, so
+# this definition is untrusted and is deliberately powerless to merge: its
+# permissions are contents: read, pull-requests: write and actions: write, and
+# it never calls `gh pr merge`. Merging is cask-pr-merge.yml, which runs main's
+# definition after cask-ci passes. The helper scripts are read from main
+# through the API, never from the branch.
+#
+# A PR is opened only when the branch, pinned to the pushed commit, changes
+# nothing except that product's own cask. Anything else gets a warning and no
+# PR, so a person looks at the branch. PRs opened with GITHUB_TOKEN do not start
+# pull_request workflows, so the script dispatches cask-ci on the branch.
+
+on:
+  push:
+    branches: ["portwing-*", "sockguard-*"]
+
+permissions: {}
+
+jobs:
+  open-pr:
+    name: open a PR for a cask branch
+    if: ${{ !github.event.deleted }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Harden the runner (audit all outbound calls)
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          dir="$(mktemp -d)"
+          for name in cask-pr-eligible.sh cask-pr-files.jq open-cask-pr.sh; do
+            if ! gh api "repos/$GH_REPO/contents/scripts/$name?ref=main" \
+              -H "Accept: application/vnd.github.raw" > "$dir/$name"; then
+              echo "::warning::scripts/$name is not on main yet; no PR opened for $BRANCH."
+              exit 0
+            fi
+          done
+
+          product="${BRANCH%%-*}"
+          case "$product" in
+            portwing | sockguard) ;;
+            *)
+              echo "::warning::Branch $BRANCH is not a portwing or sockguard release branch."
+              exit 0
+              ;;
+          esac
+          base_sha="$(gh api "repos/$GH_REPO/commits/main" --jq .sha)"
+          files="$(gh api "repos/$GH_REPO/compare/$base_sha...$HEAD_SHA" \
+            | jq -r -f "$dir/cask-pr-files.jq")"
+          if ! reason="$(printf '%s\n' "$files" | bash "$dir/cask-pr-eligible.sh" --only "$product")"; then
+            echo "::warning::No PR opened for $BRANCH. $reason"
+            exit 0
+          fi
+          title="$(gh api "repos/$GH_REPO/commits/$HEAD_SHA" \
+            --jq '.commit.message | split("\n")[0]')"
+          bash "$dir/open-cask-pr.sh" "$BRANCH" "$title" \
+            "Updates the $product cask. Pushed by the $product release as $BRANCH, checked by cask-pr-open.yml and merged by cask-pr-merge.yml once cask-ci passes."

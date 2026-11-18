@@ -1,8 +1,9 @@
 name: update-mouthtype-cask
 
 # Watches CodesWhat/mouthtype for a new published release and updates
-# Casks/mouthtype.rb to match, committing directly to main the same way the
-# goreleaser-managed casks (sockguard, portwing) already land here. The cask
+# Casks/mouthtype.rb to match by opening a pull request from a
+# mouthtype/vX.Y.Z branch. Main requires a PR and a passing `audit every cask`
+# check, and cask-pr-merge.yml merges the PR once that check passes. The cask
 # body comes from mouthtype's own scripts/generate-homebrew-cask.sh, which
 # downloads the published release DMG and hashes it, so the sha256 provably
 # matches what users download.
@@ -10,7 +11,7 @@ name: update-mouthtype-cask
 # Runs on a schedule and on manual dispatch. Uses only this repo's
 # GITHUB_TOKEN; no cross-repo credential exists on either side. If the cask
 # already matches the latest release, every run is a clean no-op. The cask is
-# audited before it is pushed.
+# audited before the branch is pushed, and again by cask-ci on the PR.
 #
 # Generation and publishing are separate jobs. Generation runs upstream code
 # (the generator script from the other repo) and `brew audit` evaluates the
@@ -32,10 +33,7 @@ jobs:
   generate:
     name: generate the mouthtype cask
     # macOS so the generated cask can be audited here, before it is pushed,
-    # rather than after users can already install it. A push made with the
-    # default GITHUB_TOKEN does not start other workflows, so cask-ci cannot
-    # cover this cask from the outside; gating in-place is the fix. The
-    # generator needs only bash, curl, shasum, awk and grep, all of which are
+    # rather than after users can already install it. The generator needs only bash, curl, shasum, awk and grep, all of which are
     # native here (it calls PlistBuddy solely to read packaging/Version.plist when
     # --version is omitted, and this workflow always passes it).
     runs-on: macos-latest
@@ -100,8 +98,13 @@ jobs:
     if: needs.generate.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # contents: write pushes the mouthtype/ branch, pull-requests: write opens
+    # the PR, actions: write dispatches cask-ci on the
+    # branch (a PR opened with GITHUB_TOKEN does not start workflows itself).
     permissions:
       contents: write
+      pull-requests: write
+      actions: write
     steps:
       - name: Harden the runner (audit all outbound calls)
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
@@ -116,11 +119,12 @@ jobs:
           path: ${{ runner.temp }}/cask
       # This job never runs upstream code and never evaluates the cask. The
       # script requires the generated file to equal the current cask except
-      # for its version and sha256 values, then commits it. The push
-      # credential exists only for the push command and is never written to
-      # .git/config.
-      - name: Verify and commit the generated cask
+      # for its version and sha256 values, then commits it to a branch and
+      # opens a PR. The push credential exists only for the push command and is
+      # never written to .git/config.
+      - name: Verify the generated cask and open a PR
         env:
           VERSION: ${{ needs.generate.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/publish-mouthtype-cask.sh

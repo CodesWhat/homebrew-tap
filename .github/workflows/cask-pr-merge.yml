@@ -1,0 +1,87 @@
+name: cask-pr-merge
+
+# Merges a cask-only pull request after cask-ci passes on it. Main requires a PR
+# and a passing `audit every cask` check with no review, and this workflow is
+# the only thing that merges. GitHub auto-merge is not used: it attaches to the
+# PR rather than the commit that was checked, so a later push could merge
+# unchecked content.
+#
+# Why workflow_run: it always runs the definition on main, so a pull request or
+# a pushed branch cannot change what this workflow does. Nothing from the PR is
+# ever checked out or run here. Only main is checked out, for scripts/.
+#
+# Why the exact sha: the merge uses --match-head-commit with the head sha of
+# the cask-ci run, and the file list comes from a compare between two shas
+# (the PR's base sha and that head sha), so what was audited, what was
+# inspected and what merges are the same commit. If the head moved, this exits
+# and the new head's own cask-ci run comes back here.
+#
+# Why the audit can be trusted: an eligible PR changes only Casks/<name>.rb, so
+# it cannot have changed .github/ or scripts/, and the cask-ci that passed ran
+# main's workflow and scripts. The decision logic is in
+# scripts/cask-pr-merge-decision.sh so it can be tested.
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers] runs main's definition, never checks out PR code
+    workflows: [cask-ci]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  merge:
+    name: merge a cask-only PR
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.event == 'pull_request' ||
+      github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Harden the runner (audit all outbound calls)
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Merge the PR if it is cask-only
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          prs="$(gh pr list --head "$HEAD_BRANCH" --state open \
+            --json number,headRefOid,baseRefName,isCrossRepository,isDraft)"
+          if [ "$(jq length <<<"$prs")" != 1 ]; then
+            echo "::notice::Expected one open PR for $HEAD_BRANCH, found $(jq length <<<"$prs"). Nothing to merge."
+            exit 0
+          fi
+          pr="$(jq -r '.[0].number' <<<"$prs")"
+          pr_sha="$(jq -r '.[0].headRefOid' <<<"$prs")"
+          base_ref="$(jq -r '.[0].baseRefName' <<<"$prs")"
+          cross="$(jq -r '.[0].isCrossRepository' <<<"$prs")"
+          draft="$(jq -r '.[0].isDraft' <<<"$prs")"
+          # Compare against main's current tip, not the PR's base. The base can
+          # be retargeted between reads, but the diff that matters is always
+          # the one against main, and a PR retargeted at merge time merges into
+          # that other branch, never into main.
+          main_sha="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)"
+
+          # One unpaginated call. cask-pr-files.jq rejects 300 or more files
+          # (the compare API's cap) and any filename that is not a plain cask.
+          files="$(gh api "repos/$GH_REPO/compare/$main_sha...$HEAD_SHA" \
+            | jq -r -f scripts/cask-pr-files.jq)"
+          decision="$(printf '%s\n' "$files" | bash scripts/cask-pr-merge-decision.sh \
+            "$HEAD_BRANCH" "$pr_sha" "$HEAD_SHA" "$base_ref" "$cross" "$draft")"
+          if [ "$decision" != merge ]; then
+            echo "::notice::PR #$pr left for a human. ${decision#skip: }"
+            exit 0
+          fi
+          gh pr merge "$pr" --squash --match-head-commit "$HEAD_SHA"
