@@ -28,7 +28,7 @@ jobs:
     name: open a PR for a cask branch
     if: ${{ !github.event.deleted }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: write

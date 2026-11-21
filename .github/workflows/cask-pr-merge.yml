@@ -6,9 +6,20 @@ name: cask-pr-merge
 # PR rather than the commit that was checked, so a later push could merge
 # unchecked content.
 #
-# Why workflow_run: it always runs the definition on main, so a pull request or
-# a pushed branch cannot change what this workflow does. Nothing from the PR is
-# ever checked out or run here. Only main is checked out, for scripts/.
+# Two triggers. workflow_run covers cask-ci runs started by a person or a
+# pull_request event. GitHub does not fire workflow_run for runs started with
+# GITHUB_TOKEN, which is how scripts/open-cask-pr.sh dispatches cask-ci, so that
+# script waits for the run to pass and then dispatches this workflow with the
+# run id (workflow_dispatch is allowed from GITHUB_TOKEN).
+#
+# Why both are safe: each always runs the definition on main, so a pull request
+# or a pushed branch cannot change what this workflow does (the dispatch job
+# also requires github.ref to be main). Nothing from the PR is ever checked out
+# or run here. Only main is checked out, for scripts/. A dispatch input is never
+# trusted: the run id is read back from the API and must be a successful,
+# completed cask-ci run of this repository, and the sha and branch come from
+# that run. Everything after that (exact sha, compare against main,
+# eligibility, --match-head-commit) is identical for both triggers.
 #
 # Why the exact sha: the merge uses --match-head-commit with the head sha of
 # the cask-ci run, and the file list comes from a compare between two shas
@@ -25,6 +36,12 @@ on:
   workflow_run: # zizmor: ignore[dangerous-triggers] runs main's definition, never checks out PR code
     workflows: [cask-ci]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: cask-ci run id whose branch head should be merged
+        required: true
+        type: string
 
 permissions: {}
 
@@ -32,9 +49,10 @@ jobs:
   merge:
     name: merge a cask-only PR
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.conclusion == 'success' &&
       (github.event.workflow_run.event == 'pull_request' ||
-      github.event.workflow_run.event == 'workflow_dispatch')
+      github.event.workflow_run.event == 'workflow_dispatch')) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -55,8 +73,28 @@ jobs:
           GH_REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_ID: ${{ inputs.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
+              echo "::notice::run_id is not a number. Nothing to merge."
+              exit 0
+            fi
+            run="$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID")"
+            if ! jq -e --arg repo "$GH_REPO" '
+                .path == ".github/workflows/cask-ci.yml" and
+                .status == "completed" and
+                .conclusion == "success" and
+                .repository.full_name == $repo and
+                .head_repository.full_name == $repo' <<<"$run" >/dev/null; then
+              echo "::notice::Run $RUN_ID is not a completed, successful cask-ci run of this repository. Nothing to merge."
+              exit 0
+            fi
+            HEAD_SHA="$(jq -r '.head_sha' <<<"$run")"
+            HEAD_BRANCH="$(jq -r '.head_branch' <<<"$run")"
+          fi
           prs="$(gh pr list --head "$HEAD_BRANCH" --state open \
             --json number,headRefOid,baseRefName,isCrossRepository,isDraft)"
           if [ "$(jq length <<<"$prs")" != 1 ]; then
