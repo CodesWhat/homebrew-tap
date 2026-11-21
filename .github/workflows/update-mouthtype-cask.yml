@@ -116,7 +116,7 @@ jobs:
     needs: generate
     if: needs.generate.outputs.changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     # contents: write pushes the mouthtype/ branch, pull-requests: write opens
     # the PR, actions: write dispatches cask-ci on the
     # branch (a PR opened with GITHUB_TOKEN does not start workflows itself).
