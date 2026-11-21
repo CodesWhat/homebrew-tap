@@ -37,12 +37,17 @@ exec "$REAL_GIT" "$@"
 """
 
 # Stub gh: records argv. `pr list` prints GH_PR_LIST (an existing PR number, or
-# nothing), `pr create` prints a PR URL.
+# nothing), `pr create` prints a PR URL, `workflow run cask-ci.yml` prints a run
+# URL, and `run watch` exits GH_WATCH_EXIT.
 GH_STUB = """#!/usr/bin/env bash
 echo "$*" >> "$GH_LOG"
 case "$1 $2" in
   "pr list") [ -n "${GH_PR_LIST:-}" ] && echo "$GH_PR_LIST"; exit 0 ;;
   "pr create") echo "https://github.com/CodesWhat/homebrew-tap/pull/7"; exit 0 ;;
+  "workflow run")
+    [ "$3" = cask-ci.yml ] && echo "https://github.com/CodesWhat/homebrew-tap/actions/runs/5551212"
+    exit 0 ;;
+  "run watch") exit "${GH_WATCH_EXIT:-0}" ;;
 esac
 exit 0
 """
@@ -146,6 +151,9 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(self.calls(out, "pr create"), 1)
         self.assertEqual(self.calls(out, f"workflow run cask-ci.yml --ref {branch}"), 1)
         self.assertEqual(self.calls(out, "pr merge"), 0)
+        self.assertEqual(self.calls(out, "run watch 5551212"), 1)
+        self.assertEqual(
+            self.calls(out, "workflow run cask-pr-merge.yml --ref main -f run_id=5551212"), 1)
         create = next(g for g in out["gh"] if g.startswith("pr create"))
         self.assertIn("--title build(cask): update mouthtype to 0.12.3", create)
         self.assertIn("--base main", create)
@@ -159,6 +167,8 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(self.calls(out, "pr create"), 0)
         self.assertEqual(self.calls(out, "workflow run cask-ci.yml --ref mouthtype/v0.12.3"), 1)
         self.assertEqual(self.calls(out, "pr merge"), 0)
+        self.assertEqual(
+            self.calls(out, "workflow run cask-pr-merge.yml --ref main -f run_id=5551212"), 1)
 
     def test_rejected_push_retries_with_lease_on_the_mouthtype_branch(self):
         out = self.publish(make_artifact(), push_first_exit=1)
