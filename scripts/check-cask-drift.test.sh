@@ -130,6 +130,14 @@ page alpha 1 '[
 ]'
 run_case 'allowlisted prerelease latest' 0 'ok     alpha        2.0.0-rc.1 (pre-release allowed)'
 
+# 4b. Empty allowlist: a stable cask is ok, a cask pinned to a prerelease drifts.
+new_case alpha 1.0.0
+page alpha 1 '[{"tag_name":"v1.0.0","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z"},{"tag_name":"v2.0.0-rc.1","draft":false,"prerelease":true,"published_at":"2026-02-01T00:00:00Z"}]'
+run_case 'empty allowlist, stable cask is ok' 0 'ok     alpha        1.0.0' '!pre-release allowed'
+new_case alpha 2.0.0-rc.1
+page alpha 1 '[{"tag_name":"v1.0.0","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z"},{"tag_name":"v2.0.0-rc.1","draft":false,"prerelease":true,"published_at":"2026-02-01T00:00:00Z"}]'
+run_case 'empty allowlist, prerelease pin drifts' 1 'DRIFT  alpha        cask pins 2.0.0-rc.1, CodesWhat/alpha latest is 1.0.0'
+
 # 5. Allowlisted, a stable published after the prerelease but created earlier.
 new_case alpha 2.0.0 allowlisted
 page alpha 1 '[

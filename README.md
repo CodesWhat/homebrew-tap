@@ -84,7 +84,7 @@ You can also review every published definition directly in
 | Product | What it does | Documentation | Availability |
 | --- | --- | --- | --- |
 | [CareerRat](https://github.com/CodesWhat/careerrat) | Local, offline-first job-search workspace | [Documentation](https://careerrat.com/docs) | Deprecated, use npm |
-| [Dilated](https://github.com/CodesWhat/dilated) | Menu bar keep-awake app for macOS 26 on Apple silicon, with triggers, agent holds and closed-lid mode | [Website](https://dilated.app/) | Public beta |
+| [Dilated](https://github.com/CodesWhat/dilated) | Menu bar keep-awake app for macOS 26 on Apple silicon, with triggers, agent holds and closed-lid mode | [Website](https://dilated.app/) | Available now |
 | [idlescreen](https://github.com/CodesWhat/idlescreen) | Metal-rendered ASCII art screen saver and companion Studio for macOS | [README](https://github.com/CodesWhat/idlescreen#readme) | Available now |
 | [Mouthtype](https://github.com/CodesWhat/mouthtype) | Local voice dictation with on-device cleanup | [Getting started](https://mouthtype.app/start/) | Available now |
 | [Portwing](https://github.com/CodesWhat/portwing) | Security-first remote Docker agent for Drydock and standalone API clients | [Installation guide](https://github.com/CodesWhat/portwing/blob/main/docs/content/docs/installation.mdx) | Available now |
@@ -249,12 +249,12 @@ release tooling. On each stable release, the source project:
    merges once the `audit every cask` check passes; and
 5. smoke-tests installation from `codeswhat/tap` on a clean runner.
 
-Snapshots and prereleases do not update the tap, with one named exception:
-Dilated ships as a public beta from GitHub prereleases until 1.0.0, listed in
-[`audit_exceptions/github_prerelease_allowlist.json`](audit_exceptions/github_prerelease_allowlist.json).
-When Dilated publishes a stable release, the drift check fails until that
-entry is removed. Homebrew's audit also fails if the cask pins a stable release
-while the entry remains. Do not edit a generated cask by hand. For a
+Snapshots and prereleases do not update the tap. A project that has to track
+prereleases needs a named entry in
+[`audit_exceptions/github_prerelease_allowlist.json`](audit_exceptions/github_prerelease_allowlist.json),
+which is empty today. Once that project's latest release is stable, the drift
+check fails until the entry is removed. Homebrew's audit also fails if the cask
+pins a stable release while the entry remains. Do not edit a generated cask by hand. For a
 generated cask, see the generator header when it has one, otherwise the owning
 CodesWhat/<cask> repository's release tooling, and fix it there so the next
 release preserves the change. The careerrat cask is frozen and maintained by
