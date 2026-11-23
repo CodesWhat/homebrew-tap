@@ -373,6 +373,11 @@ README improvements are welcome here. Changes to generated casks should be made
 in the owning source repository, where they can be validated by the complete
 release pipeline.
 
+To work on the scripts or workflows, run `lefthook install` once after cloning.
+It sets up a pre-push hook that runs [Qlty](https://qlty.sh) on your changes and
+the offline cask audit (`bash scripts/audit-casks.sh`), so most problems show up
+before CI does.
+
 <p align="center">
   Built and maintained by <a href="https://github.com/CodesWhat">CodesWhat?</a>
 </p>
