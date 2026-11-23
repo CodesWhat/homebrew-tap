@@ -1,0 +1,6 @@
+pre-push:
+  commands:
+    qlty:
+      run: qlty check --upstream origin/main
+    audit-casks:
+      run: bash scripts/audit-casks.sh

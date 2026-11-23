@@ -1,0 +1,13 @@
+extends: default
+
+rules:
+  # GitHub workflows don't use a leading "---".
+  document-start: disable
+  # "on:" is a workflow key, not a boolean.
+  truthy:
+    check-keys: false
+  # Pinned actions carry a trailing "# vX.Y.Z" comment with one space, and
+  # workflow run lines and URLs run long.
+  comments:
+    min-spaces-from-content: 1
+  line-length: disable
