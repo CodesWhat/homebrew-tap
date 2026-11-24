@@ -20,6 +20,12 @@ case "$1 $2" in
   "workflow run")
     [ "$3" = cask-ci.yml ] && printf '%s\n' "${STUB_DISPATCH_OUT-}"
     exit 0 ;;
+  "run view")
+    # Fails the first $STUB_VIEW_FAILS calls, like a run the API can't serve yet.
+    n=$(($(cat "$GH_VIEW_COUNT" 2>/dev/null || echo 0) + 1))
+    echo "$n" >"$GH_VIEW_COUNT"
+    [ "$n" -le "${STUB_VIEW_FAILS:-0}" ] && { echo "HTTP 404: Not Found" >&2; exit 1; }
+    exit 0 ;;
   "run watch") exit "${STUB_WATCH_EXIT:-0}" ;;
 esac
 exit 0
@@ -28,7 +34,9 @@ chmod +x "$tmp/bin/gh"
 
 run_script() {
   : >"$tmp/gh.log"
-  out="$(PATH="$tmp/bin:$PATH" GH_LOG="$tmp/gh.log" bash "$script" mouthtype/v1.2.3 title body 2>&1)"
+  rm -f "$tmp/view.count"
+  out="$(PATH="$tmp/bin:$PATH" GH_LOG="$tmp/gh.log" GH_VIEW_COUNT="$tmp/view.count" \
+    OPEN_CASK_PR_POLL_SECONDS=0 OPEN_CASK_PR_VISIBLE_TRIES=3 bash "$script" mouthtype/v1.2.3 title body 2>&1)"
   rc=$?
 }
 
@@ -72,6 +80,17 @@ expect "no run id: no merger dispatch" "$(lacks 'cask-pr-merge.yml')"
 STUB_PR_LIST="12" STUB_DISPATCH_OUT="" STUB_WATCH_EXIT=0 run_script
 expect "empty dispatch output: exit 1" "$(rc_is 1)"
 expect "empty dispatch output: no merger dispatch" "$(lacks 'cask-pr-merge.yml')"
+
+STUB_PR_LIST="12" STUB_DISPATCH_OUT="$url" STUB_VIEW_FAILS=2 run_script
+expect "run 404s at first: exit 0" "$(rc_is 0)"
+expect "run 404s at first: retried until visible" "$([ "$(grep -c '^run view 44912585826' "$tmp/gh.log")" = 3 ] && echo 1 || echo 0)"
+expect "run 404s at first: merger dispatched" "$(has "$merge_call")"
+
+STUB_PR_LIST="12" STUB_DISPATCH_OUT="$url" STUB_VIEW_FAILS=9 run_script
+expect "run never visible: exit 1" "$(rc_is 1)"
+expect "run never visible: says so" "$(grep -q 'cask-ci run 44912585826 never became visible; PR #12 left for a human.' <<<"$out" && echo 1 || echo 0)"
+expect "run never visible: no watch" "$(lacks 'run watch')"
+expect "run never visible: no merger dispatch" "$(lacks 'cask-pr-merge.yml')"
 
 STUB_PR_LIST="12" STUB_DISPATCH_OUT="$url" STUB_WATCH_EXIT=1 run_script
 expect "watch fails: exit 1" "$(rc_is 1)"

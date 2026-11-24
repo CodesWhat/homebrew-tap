@@ -39,6 +39,19 @@ case "$run_id" in
 esac
 echo "Dispatched cask-ci run $run_id on $branch."
 
+# A freshly dispatched run can 404 for a few seconds before the API serves it,
+# and `gh run watch` gives up on the first 404. Wait until the run is visible.
+tries="${OPEN_CASK_PR_VISIBLE_TRIES:-30}"
+pause="${OPEN_CASK_PR_POLL_SECONDS:-5}"
+until gh run view "$run_id" --json status >/dev/null 2>&1; do
+  tries=$((tries - 1))
+  if [ "$tries" -le 0 ]; then
+    echo "cask-ci run $run_id never became visible; PR #$pr left for a human." >&2
+    exit 1
+  fi
+  sleep "$pause"
+done
+
 if ! gh run watch "$run_id" --exit-status --interval 10 >/dev/null; then
   echo "cask-ci run $run_id did not pass; PR #$pr left for a human." >&2
   exit 1
