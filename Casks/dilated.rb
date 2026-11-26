@@ -6,6 +6,12 @@ cask "dilated" do
   name "Dilated"
   desc "Keep your Mac awake, with reasons"
   homepage "https://dilated.app/"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
   auto_updates true
   depends_on arch: :arm64
   depends_on macos: :tahoe
