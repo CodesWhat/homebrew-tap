@@ -122,4 +122,16 @@ jobs:
             echo "::notice::PR #$pr left for a human. ${decision#skip: }"
             exit 0
           fi
-          gh pr merge "$pr" --squash --match-head-commit "$HEAD_SHA"
+          # A dispatched run and a workflow_run can arrive for the same PR
+          # seconds apart (a person's push starts cask-ci on its own). The
+          # loser of that race is not a failure.
+          if ! out="$(gh pr merge "$pr" --squash --match-head-commit "$HEAD_SHA" 2>&1)"; then
+            if grep -q "Merge already in progress" <<<"$out" ||
+              [ "$(gh pr view "$pr" --json state --jq .state)" = MERGED ]; then
+              echo "::notice::PR #$pr was merged by another cask-pr-merge run."
+              exit 0
+            fi
+            printf '%s\n' "$out" >&2
+            exit 1
+          fi
+          printf '%s\n' "$out"
