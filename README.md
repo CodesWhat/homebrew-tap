@@ -18,6 +18,7 @@
   <img src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-informational?logo=linux&logoColor=white" alt="macOS and Linux">
   <a href="https://github.com/CodesWhat/homebrew-tap/commits/main"><img src="https://img.shields.io/github/last-commit/CodesWhat/homebrew-tap?style=flat" alt="Last commit"></a>
   <a href="https://github.com/CodesWhat/homebrew-tap/issues"><img src="https://img.shields.io/github/issues/CodesWhat/homebrew-tap?style=flat" alt="Issues"></a>
+  <a href="https://qlty.sh/gh/CodesWhat/projects/homebrew-tap"><img src="https://qlty.sh/gh/CodesWhat/projects/homebrew-tap/maintainability.svg" alt="Maintainability"></a>
 </p>
 
 <hr>
