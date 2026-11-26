@@ -31,6 +31,8 @@ cask "portwing" do
     skip "Auto-generated on release."
   end
 
+  disable! date: "2026-11-26", because: "is no longer published for macOS. Run Portwing as a container instead: https://portwing.codeswhat.com/docs/installation"
+
   binary "portwing"
 
   # No zap stanza required
