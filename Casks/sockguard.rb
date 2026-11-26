@@ -37,6 +37,8 @@ cask "sockguard" do
     skip "Auto-generated on release."
   end
 
+  deprecate! date: "2026-11-26", because: "is a Linux Docker server tool. Run it from the Docker image instead: https://getsockguard.com/docs/getting-started"
+
   binary "sockguard"
 
   # No zap stanza required

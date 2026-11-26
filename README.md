@@ -58,10 +58,9 @@ brew install --cask codeswhat/tap/idlescreen
 # Mouthtype
 brew install --cask codeswhat/tap/mouthtype
 
-# Portwing
+# Portwing and Sockguard are Linux Docker server tools. Run them from their
+# Docker images. The casks are deprecated, last releases 1.5.0 and 2.4.9
 brew install --cask codeswhat/tap/portwing
-
-# Sockguard
 brew install --cask codeswhat/tap/sockguard
 ```
 
@@ -70,9 +69,9 @@ then trust only the cask you intend to install:
 
 ```bash
 brew tap codeswhat/tap
-less "$(brew --repository codeswhat/tap)/Casks/portwing.rb"
-brew trust --cask codeswhat/tap/portwing
-brew install --cask codeswhat/tap/portwing
+less "$(brew --repository codeswhat/tap)/Casks/mouthtype.rb"
+brew trust --cask codeswhat/tap/mouthtype
+brew install --cask codeswhat/tap/mouthtype
 ```
 
 You can also review every published definition directly in
@@ -88,8 +87,8 @@ You can also review every published definition directly in
 | [Dilated](https://github.com/CodesWhat/dilated) | Menu bar keep-awake app for macOS 26 on Apple silicon, with triggers, agent holds and closed-lid mode | [Website](https://dilated.app/) | Available now |
 | [idlescreen](https://github.com/CodesWhat/idlescreen) | Metal-rendered ASCII art screen saver and companion Studio for macOS | [README](https://github.com/CodesWhat/idlescreen#readme) | Available now |
 | [Mouthtype](https://github.com/CodesWhat/mouthtype) | Local voice dictation with on-device cleanup | [Getting started](https://mouthtype.app/start/) | Available now |
-| [Portwing](https://github.com/CodesWhat/portwing) | Security-first remote Docker agent for Drydock and standalone API clients | [Installation guide](https://github.com/CodesWhat/portwing/blob/main/docs/content/docs/installation.mdx) | Available now |
-| [Sockguard](https://github.com/CodesWhat/sockguard) | Default-deny Docker socket proxy with granular request filtering and audit logging | [Getting started](https://getsockguard.com/docs/getting-started) | Available now |
+| [Portwing](https://github.com/CodesWhat/portwing) | Security-first remote Docker agent for Drydock and standalone API clients | [Installation guide](https://github.com/CodesWhat/portwing/blob/main/docs/content/docs/installation.mdx) | Deprecated, use Docker |
+| [Sockguard](https://github.com/CodesWhat/sockguard) | Default-deny Docker socket proxy with granular request filtering and audit logging | [Getting started](https://getsockguard.com/docs/getting-started) | Deprecated, use Docker |
 
 This repository distributes official prebuilt release archives. Project source,
 configuration, documentation, changelogs, and issue tracking remain in each
@@ -214,7 +213,7 @@ Each cask:
 
 Homebrew 6 and later requires explicit trust for non-official taps because cask
 definitions are executable Ruby. A fully qualified install such as
-`brew install --cask codeswhat/tap/portwing` trusts only that named cask. This
+`brew install --cask codeswhat/tap/mouthtype` trusts only that named cask. This
 README intentionally does not recommend trusting the entire tap; use
 `brew trust --cask` when you want an explicit review-and-trust step.
 
