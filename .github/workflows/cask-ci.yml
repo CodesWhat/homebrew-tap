@@ -85,5 +85,7 @@ jobs:
         run: bash scripts/delete-merged-branch.test.sh
       - name: Test cask PR opener
         run: bash scripts/open-cask-pr.test.sh
+      - name: Test main ruleset apply script
+        run: bash scripts/apply-main-ruleset.test.sh
       - name: Audit the casks
         run: bash scripts/audit-casks.sh
