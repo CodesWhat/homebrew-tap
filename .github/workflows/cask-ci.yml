@@ -81,6 +81,8 @@ jobs:
         run: bash scripts/cask-pr-files.test.sh
       - name: Test cask PR merge decision
         run: bash scripts/cask-pr-merge-decision.test.sh
+      - name: Test merged-branch cleanup
+        run: bash scripts/delete-merged-branch.test.sh
       - name: Test cask PR opener
         run: bash scripts/open-cask-pr.test.sh
       - name: Audit the casks

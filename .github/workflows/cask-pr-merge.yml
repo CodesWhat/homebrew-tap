@@ -129,9 +129,14 @@ jobs:
             if grep -q "Merge already in progress" <<<"$out" ||
               [ "$(gh pr view "$pr" --json state --jq .state)" = MERGED ]; then
               echo "::notice::PR #$pr was merged by another cask-pr-merge run."
+              bash scripts/delete-merged-branch.sh "$pr" "$HEAD_BRANCH"
               exit 0
             fi
             printf '%s\n' "$out" >&2
             exit 1
           fi
           printf '%s\n' "$out"
+          # delete_branch_on_merge does not fire for a merge made with
+          # GITHUB_TOKEN, so the head branch is removed here. It never fails
+          # the job: the merge already happened.
+          bash scripts/delete-merged-branch.sh "$pr" "$HEAD_BRANCH"
