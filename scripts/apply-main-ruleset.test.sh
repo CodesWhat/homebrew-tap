@@ -61,8 +61,17 @@ run() {
   fi
 }
 
-# What the live ruleset looks like once the target is applied.
-jq '. + {id: 1, source: "x"}' "$target" >"$tmp/after.json"
+# What the live ruleset looks like once the target is applied, including the
+# server-default parameter keys the target doesn't set.
+jq '. + {id: 1, source: "x"}
+  | .rules |= map(if .type == "pull_request"
+      then .parameters += {dismissal_restriction: null, require_extra_approval_for_unattributed_changes: false, required_reviewers: []}
+      else . end)' "$target" >"$tmp/after.json"
+# The same read, but with a value the target sets changed.
+jq '(.rules[] | select(.type == "pull_request") | .parameters.required_approving_review_count) = 1' \
+  "$tmp/after.json" >"$tmp/after-count.json"
+# The same read, missing a rule the target has.
+jq '.rules |= map(select(.type != "required_status_checks"))' "$tmp/after.json" >"$tmp/after-norule.json"
 # A PUT the API silently changes.
 jq '.enforcement = "evaluate"' "$tmp/after.json" >"$tmp/after-bad.json"
 
@@ -87,6 +96,11 @@ STUB_PORT_ENVS=$'release\nprod' STUB_ENV_SECRETS=HOMEBREW_TAP_TOKEN \
 
 STUB_AFTER="$tmp/after-bad.json" \
   run "verify mismatch after PUT fails" 1 yes "Applied, but the live ruleset differs" --apply
+
+STUB_AFTER="$tmp/after-count.json" \
+  run "verify fails when a target-set parameter differs" 1 yes "Applied, but the live ruleset differs" --apply
+STUB_AFTER="$tmp/after-norule.json" \
+  run "verify fails when a rule is missing" 1 yes "Applied, but the live ruleset differs" --apply
 
 if [ "$failures" -ne 0 ]; then
   echo "$failures failure(s)"

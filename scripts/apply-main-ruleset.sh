@@ -17,7 +17,7 @@
 #   c. HOMEBREW_TAP_TOKEN is not a secret on sockguard or any portwing
 #      environment (nothing is left that could push to main)
 # Then it PUTs the JSON, re-reads the ruleset and fails if the normalized live
-# copy differs from the file.
+# copy, projected onto the file's shape, differs from the file.
 #
 # Env: REPO (default CodesWhat/homebrew-tap), RULESET_ID (default 20918191),
 # RULESET_FILE (default rulesets/protect-main.json beside this script).
@@ -46,11 +46,29 @@ normalize() {
   jq -S '{name, target, enforcement, conditions, bypass_actors, rules: (.rules | sort_by(.type))}'
 }
 
+# project <want.json>: narrows a normalized live ruleset to the target's shape.
+# GitHub returns server-default parameter keys the target doesn't set, so for
+# each rule that also exists in the target (matched by type) only the
+# parameter keys the target sets are kept. A rule type present on one side
+# only still differs, and so does a different value for a key the target sets.
+project() {
+  jq -S --slurpfile want "$1" '
+    $want[0] as $w
+    | .rules |= map(
+        . as $r
+        | ($w.rules | map(select(.type == $r.type)) | first) as $wr
+        | if $wr == null then $r
+          elif ($wr.parameters | type) != "object" then del(.parameters)
+          elif ($r.parameters | type) != "object" then $r
+          else .parameters |= with_entries(select(.key as $k | $wr.parameters | has($k)))
+          end)'
+}
+
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 normalize <"$file" >"$tmp/want.json"
-gh api "$endpoint" | normalize >"$tmp/live.json"
+gh api "$endpoint" | normalize | project "$tmp/want.json" >"$tmp/live.json"
 
 if [ "$apply" -eq 0 ]; then
   echo "Dry run: live ruleset $id on $repo (-) versus $file (+)"
@@ -99,7 +117,7 @@ done <<<"$envs"
 echo "Preconditions hold. Applying $file to ruleset $id on $repo."
 gh api -X PUT "$endpoint" --input "$file" >/dev/null
 
-gh api "$endpoint" | normalize >"$tmp/after.json"
+gh api "$endpoint" | normalize | project "$tmp/want.json" >"$tmp/after.json"
 if ! diff -u --label live-after-put --label target "$tmp/after.json" "$tmp/want.json"; then
   echo "Applied, but the live ruleset differs from $file." >&2
   exit 1
